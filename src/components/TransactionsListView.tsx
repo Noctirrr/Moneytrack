@@ -9,7 +9,8 @@ import {
   ArrowDownLeft, 
   ArrowUpRight, 
   X,
-  Receipt
+  Receipt,
+  FileDown
 } from 'lucide-react';
 import { Transaction, Category, Language } from '../types';
 import { translations } from '../constants/translations';
@@ -24,6 +25,7 @@ interface TransactionsListViewProps {
   onEditTransaction: (item: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
   onClearAllTransactions?: () => void;
+  onOpenPdfExport?: () => void;
 }
 
 export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
@@ -34,6 +36,7 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
   onEditTransaction,
   onDeleteTransaction,
   onClearAllTransactions,
+  onOpenPdfExport,
 }) => {
   const t = translations[lang];
 
@@ -135,6 +138,17 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenPdfExport && (
+            <button
+              id="tx-pdf-export-btn"
+              onClick={onOpenPdfExport}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-100 text-sm font-semibold shadow-sm transition-all active:scale-95"
+              title={lang === 'th' ? 'ดาวน์โหลดรายงาน PDF' : 'Download PDF Report'}
+            >
+              <FileDown size={16} className="text-neutral-600 dark:text-neutral-300" />
+              <span>{lang === 'th' ? 'ดาวน์โหลด PDF' : 'Download PDF'}</span>
+            </button>
+          )}
           {transactions.length > 0 && onClearAllTransactions && (
             <button
               id="clear-all-tx-btn-from-list"

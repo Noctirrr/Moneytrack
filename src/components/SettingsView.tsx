@@ -11,8 +11,8 @@ import {
   RefreshCcw, 
   Trash2, 
   CloudCheck, 
-  ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  FileDown
 } from 'lucide-react';
 import { Language, ThemeMode, Transaction, Category } from '../types';
 import { translations } from '../constants/translations';
@@ -32,6 +32,7 @@ interface SettingsViewProps {
   onImportData: (data: { transactions: Transaction[]; categories?: Category[] }) => void;
   onResetSampleData: () => void;
   onClearAllData: () => void;
+  onOpenPdfExport?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -48,6 +49,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onImportData,
   onResetSampleData,
   onClearAllData,
+  onOpenPdfExport,
 }) => {
   const t = translations[lang];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -281,6 +283,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          {/* Download PDF Report */}
+          {onOpenPdfExport && (
+            <button
+              id="settings-pdf-export-btn"
+              onClick={onOpenPdfExport}
+              className="col-span-1 sm:col-span-2 flex items-center justify-center gap-2 p-3.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold shadow-sm hover:opacity-90 active:scale-95 transition-all"
+            >
+              <FileDown size={16} />
+              <span>{lang === 'th' ? '📄 ดาวน์โหลดรายงานการเงิน (PDF)' : '📄 Download Financial Report (PDF)'}</span>
+            </button>
+          )}
+
           {/* Export JSON */}
           <button
             id="export-data-btn"

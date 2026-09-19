@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { User } from 'firebase/auth';
 import { 
   BarChart3, 
   PieChart as PieIcon, 
@@ -6,27 +7,37 @@ import {
   TrendingDown, 
   Calendar,
   Percent,
-  Receipt
+  Receipt,
+  FileDown,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import { Transaction, Category, Language } from '../types';
 import { translations } from '../constants/translations';
 import { formatCurrency } from '../utils/format';
 import { CategoryIcon } from './CategoryIcon';
+import { generateFinancialReportPDF } from '../utils/reportPdf';
 
 interface ReportsViewProps {
   transactions: Transaction[];
   categories: Category[];
   lang: Language;
+  user?: User | null;
+  onOpenPdfExport?: (period?: 'daily' | 'weekly' | 'monthly' | 'all') => void;
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   transactions,
   categories,
   lang,
+  user,
+  onOpenPdfExport,
 }) => {
   const t = translations[lang];
 
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfSuccess, setPdfSuccess] = useState(false);
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, Category>();
@@ -123,9 +134,34 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       .sort((a, b) => b.amount - a.amount);
   }, [periodTransactions, totals.income, categoryMap]);
 
+  const handleDownloadReport = async () => {
+    if (onOpenPdfExport) {
+      onOpenPdfExport(period);
+      return;
+    }
+    if (isGeneratingPdf) return;
+    try {
+      setIsGeneratingPdf(true);
+      setPdfSuccess(false);
+      await generateFinancialReportPDF({
+        transactions: periodTransactions.length > 0 ? periodTransactions : transactions,
+        categories,
+        period,
+        lang,
+        userEmail: user?.email,
+      });
+      setPdfSuccess(true);
+      setTimeout(() => setPdfSuccess(false), 4000);
+    } catch (err) {
+      console.error('Failed to generate PDF report:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div id="reports-view" className="space-y-6">
-      {/* Header & Period Switcher */}
+      {/* Header & Period Switcher & Download Report Button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-neutral-200 dark:border-neutral-800">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
@@ -136,40 +172,68 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </p>
         </div>
 
-        {/* Period Segmented Toggle */}
-        <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Period Segmented Toggle */}
+          <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
+            <button
+              id="period-daily-btn"
+              onClick={() => setPeriod('daily')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                period === 'daily'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              {t.periodDaily}
+            </button>
+            <button
+              id="period-weekly-btn"
+              onClick={() => setPeriod('weekly')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                period === 'weekly'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              {t.periodWeekly}
+            </button>
+            <button
+              id="period-monthly-btn"
+              onClick={() => setPeriod('monthly')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                period === 'monthly'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              {t.periodMonthly}
+            </button>
+          </div>
+
+          {/* Download Report Button */}
           <button
-            id="period-daily-btn"
-            onClick={() => setPeriod('daily')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              period === 'daily'
-                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
-                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-            }`}
+            id="download-report-pdf-btn"
+            onClick={handleDownloadReport}
+            disabled={isGeneratingPdf}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            title={t.downloadReportPdf}
           >
-            {t.periodDaily}
-          </button>
-          <button
-            id="period-weekly-btn"
-            onClick={() => setPeriod('weekly')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              period === 'weekly'
-                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
-                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-            }`}
-          >
-            {t.periodWeekly}
-          </button>
-          <button
-            id="period-monthly-btn"
-            onClick={() => setPeriod('monthly')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              period === 'monthly'
-                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
-                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-            }`}
-          >
-            {t.periodMonthly}
+            {isGeneratingPdf ? (
+              <>
+                <Loader2 size={15} className="animate-spin text-amber-400" />
+                <span>{t.generatingPdf}</span>
+              </>
+            ) : pdfSuccess ? (
+              <>
+                <CheckCircle2 size={15} className="text-emerald-400" />
+                <span>{lang === 'th' ? 'ดาวน์โหลดแล้ว' : 'Downloaded!'}</span>
+              </>
+            ) : (
+              <>
+                <FileDown size={15} />
+                <span>{t.downloadReportPdf}</span>
+              </>
+            )}
           </button>
         </div>
       </div>

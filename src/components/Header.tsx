@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
-import { Globe, LogIn, LogOut, CheckCircle2, CloudOff, Sun, Moon } from 'lucide-react';
+import { Globe, LogIn, LogOut, CheckCircle2, CloudOff, Sun, Moon, FileDown } from 'lucide-react';
 import { Language, ThemeMode } from '../types';
 import { translations } from '../constants/translations';
 
@@ -15,6 +15,7 @@ interface HeaderProps {
   onSignIn: () => void;
   onSignOut: () => void;
   isSyncing: boolean;
+  onOpenPdfExport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSignIn,
   onSignOut,
   isSyncing,
+  onOpenPdfExport,
 }) => {
   const t = translations[lang];
 
@@ -131,6 +133,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               )}
             </button>
+
+            {/* Quick PDF Report Export Button */}
+            {onOpenPdfExport && (
+              <button
+                id="header-pdf-export-btn"
+                onClick={onOpenPdfExport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 active:scale-95 transition-all shadow-sm"
+                title={lang === 'th' ? 'ดาวน์โหลดรายงาน PDF' : 'Download PDF Report'}
+              >
+                <FileDown size={14} className="text-neutral-600 dark:text-neutral-300" />
+                <span>PDF</span>
+              </button>
+            )}
 
             {/* Auth with Gmail */}
             {user ? (

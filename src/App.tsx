@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, loginWithGoogle, logoutUser } from './firebase';
-import { Transaction, Category, Language, ThemeMode } from './types';
+import { Transaction, Category, Language, ThemeMode, SystemAnnouncement, SystemConfig } from './types';
 import { DEFAULT_CATEGORIES } from './constants/categories';
 import { getSampleTransactions } from './constants/sampleData';
 import { translations } from './constants/translations';
@@ -13,6 +13,9 @@ import { TransactionsListView } from './components/TransactionsListView';
 import { CategoriesView } from './components/CategoriesView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
+import { PdfExportModal } from './components/PdfExportModal';
+import { AnnouncementBanner } from './components/AnnouncementBanner';
+import { Activity } from 'lucide-react';
 import { 
   subscribeToTransactions, 
   saveTransactionToFirestore, 
@@ -20,7 +23,11 @@ import {
   clearAllTransactionsFromFirestore,
   subscribeToCustomCategories,
   saveCustomCategoryToFirestore,
-  deleteCustomCategoryFromFirestore
+  deleteCustomCategoryFromFirestore,
+  subscribeToSystemAnnouncement,
+  subscribeToSystemConfig,
+  subscribeToGlobalCategories,
+  recordUserProfile
 } from './services/firestoreService';
 
 const LOCAL_STORAGE_TX_KEY = 'moneytrack_transactions';
@@ -38,6 +45,20 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
+  // PDF Export Modal State
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfInitialPeriod, setPdfInitialPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('monthly');
+
+  const handleOpenPdfExport = (initialPeriod: 'daily' | 'weekly' | 'monthly' | 'all' = 'monthly') => {
+    setPdfInitialPeriod(initialPeriod);
+    setIsPdfModalOpen(true);
+  };
+
+  // System-level states (from Firestore /system)
+  const [systemAnnouncement, setSystemAnnouncement] = useState<SystemAnnouncement | null>(null);
+  const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null);
+  const [globalCategories, setGlobalCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+
   // Language: Thai as default per instructions
   const [lang, setLang] = useState<Language>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_LANG_KEY);
@@ -50,7 +71,7 @@ export default function App() {
     return saved === 'dark' ? 'dark' : 'light';
   });
 
-  // State: Categories
+  // State: Custom Categories
   const [customCategories, setCustomCategories] = useState<Category[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_CAT_KEY);
@@ -60,9 +81,32 @@ export default function App() {
     }
   });
 
+  // Combine global system categories with user custom categories
   const allCategories = useMemo(() => {
-    return [...DEFAULT_CATEGORIES, ...customCategories];
-  }, [customCategories]);
+    const sourceGlobal = globalCategories.length > 0 ? globalCategories : DEFAULT_CATEGORIES;
+    return [...sourceGlobal, ...customCategories];
+  }, [globalCategories, customCategories]);
+
+  // Subscribe to system-wide collections
+  useEffect(() => {
+    const unsubAnn = subscribeToSystemAnnouncement((ann) => {
+      setSystemAnnouncement(ann);
+    });
+    const unsubCfg = subscribeToSystemConfig((cfg) => {
+      setSystemConfig(cfg);
+    });
+    const unsubCats = subscribeToGlobalCategories((cats) => {
+      if (cats && cats.length > 0) {
+        setGlobalCategories(cats);
+      }
+    });
+
+    return () => {
+      unsubAnn();
+      unsubCfg();
+      unsubCats();
+    };
+  }, []);
 
   // State: Transactions (defaults to empty so user starts clean to add new records)
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -127,6 +171,9 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
+      if (currentUser) {
+        recordUserProfile(currentUser);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -184,18 +231,26 @@ export default function App() {
     data: Omit<Transaction, 'id' | 'createdAt'> & { id?: string }
   ) => {
     if (user) {
-      await saveTransactionToFirestore(user.uid, {
-        type: data.type,
-        amount: data.amount,
-        categoryId: data.categoryId,
-        categoryName: data.categoryName || '',
-        date: data.date,
-        note: data.note || '',
-        ...(data.id ? { id: data.id } : {}),
-        createdAt: data.id 
-          ? (transactions.find((t) => t.id === data.id)?.createdAt || Date.now()) 
-          : Date.now(),
-      });
+      await saveTransactionToFirestore(
+        user.uid,
+        {
+          type: data.type,
+          amount: data.amount,
+          categoryId: data.categoryId,
+          categoryName: data.categoryName || '',
+          date: data.date,
+          note: data.note || '',
+          ...(data.id ? { id: data.id } : {}),
+          createdAt: data.id 
+            ? (transactions.find((t) => t.id === data.id)?.createdAt || Date.now()) 
+            : Date.now(),
+        },
+        {
+          email: user.email || '',
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || '',
+        }
+      );
     } else {
       // Offline / Local mode
       if (data.id) {
@@ -342,91 +397,122 @@ export default function App() {
         onSignIn={handleSignIn}
         onSignOut={handleSignOut}
         isSyncing={isSyncing}
+        onOpenPdfExport={() => handleOpenPdfExport('monthly')}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 md:pb-12">
-        {currentTab === 'dashboard' && (
-          <DashboardView
-            transactions={transactions}
-            categories={allCategories}
-            lang={lang}
-            onNavigate={(tab) => setCurrentTab(tab)}
-            onQuickAdd={() => {
-              setEditingTransaction(null);
-              setCurrentTab('add');
-            }}
-            onEditTransaction={(item) => {
-              setEditingTransaction(item);
-              setCurrentTab('add');
-            }}
-          />
-        )}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 md:pb-12 space-y-6">
+        {/* System Announcement Banner (visible to all users when active) */}
+        <AnnouncementBanner announcement={systemAnnouncement} />
 
-        {currentTab === 'transactions' && (
-          <TransactionsListView
-            transactions={transactions}
-            categories={allCategories}
-            lang={lang}
-            onAddTransaction={() => {
-              setEditingTransaction(null);
-              setCurrentTab('add');
-            }}
-            onEditTransaction={(item) => {
-              setEditingTransaction(item);
-              setCurrentTab('add');
-            }}
-            onDeleteTransaction={handleDeleteTransaction}
-            onClearAllTransactions={handleClearAllData}
-          />
-        )}
+        {/* System Maintenance Check */}
+        {systemConfig?.maintenanceMode ? (
+          <div className="max-w-lg mx-auto my-12 p-8 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl shadow-sm text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
+              <Activity size={28} />
+            </div>
+            <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
+              {lang === 'th' ? 'ระบบกำลังปิดปรับปรุงชั่วคราว' : 'System Maintenance'}
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-500 leading-relaxed">
+              {systemConfig.maintenanceMessage || 
+                (lang === 'th' 
+                  ? 'เรากำลังปรับปรุงระบบเพื่อเพิ่มประสิทธิภาพการใช้งาน ขออภัยในความไม่สะดวก' 
+                  : 'We are updating our systems. Please check back shortly.')}
+            </p>
+          </div>
+        ) : (
+          <>
+            {currentTab === 'dashboard' && (
+              <DashboardView
+                transactions={transactions}
+                categories={allCategories}
+                lang={lang}
+                onNavigate={(tab) => setCurrentTab(tab)}
+                onQuickAdd={() => {
+                  setEditingTransaction(null);
+                  setCurrentTab('add');
+                }}
+                onEditTransaction={(item) => {
+                  setEditingTransaction(item);
+                  setCurrentTab('add');
+                }}
+                onOpenPdfExport={() => handleOpenPdfExport('monthly')}
+                user={user}
+                onSignIn={handleSignIn}
+              />
+            )}
 
-        {currentTab === 'add' && (
-          <AddEditTransactionView
-            initialData={editingTransaction}
-            categories={allCategories}
-            lang={lang}
-            onSave={handleSaveTransaction}
-            onCancel={() => {
-              setEditingTransaction(null);
-              setCurrentTab('dashboard');
-            }}
-          />
-        )}
+            {currentTab === 'transactions' && (
+              <TransactionsListView
+                transactions={transactions}
+                categories={allCategories}
+                lang={lang}
+                onAddTransaction={() => {
+                  setEditingTransaction(null);
+                  setCurrentTab('add');
+                }}
+                onEditTransaction={(item) => {
+                  setEditingTransaction(item);
+                  setCurrentTab('add');
+                }}
+                onDeleteTransaction={handleDeleteTransaction}
+                onClearAllTransactions={handleClearAllData}
+                onOpenPdfExport={() => handleOpenPdfExport('all')}
+              />
+            )}
 
-        {currentTab === 'categories' && (
-          <CategoriesView
-            categories={allCategories}
-            lang={lang}
-            onAddCustomCategory={handleAddCustomCategory}
-            onDeleteCategory={handleDeleteCategory}
-          />
-        )}
+            {currentTab === 'add' && (
+              <AddEditTransactionView
+                initialData={editingTransaction}
+                categories={allCategories}
+                lang={lang}
+                onSave={handleSaveTransaction}
+                onCancel={() => {
+                  setEditingTransaction(null);
+                  setCurrentTab('dashboard');
+                }}
+              />
+            )}
 
-        {currentTab === 'reports' && (
-          <ReportsView
-            transactions={transactions}
-            categories={allCategories}
-            lang={lang}
-          />
-        )}
+            {currentTab === 'categories' && (
+              <CategoriesView
+                categories={allCategories}
+                lang={lang}
+                onAddCustomCategory={handleAddCustomCategory}
+                onDeleteCategory={handleDeleteCategory}
+              />
+            )}
 
-        {currentTab === 'settings' && (
-          <SettingsView
-            lang={lang}
-            onLanguageChange={handleLanguageChange}
-            theme={theme}
-            onThemeToggle={handleThemeToggle}
-            onThemeChange={handleThemeChange}
-            user={user}
-            onSignIn={handleSignIn}
-            onSignOut={handleSignOut}
-            transactions={transactions}
-            categories={allCategories}
-            onImportData={handleImportData}
-            onResetSampleData={handleResetSampleData}
-            onClearAllData={handleClearAllData}
-          />
+            {currentTab === 'reports' && (
+              <ReportsView
+                transactions={transactions}
+                categories={allCategories}
+                lang={lang}
+                user={user}
+                onOpenPdfExport={(period) => handleOpenPdfExport(period || 'monthly')}
+              />
+            )}
+
+            {currentTab === 'settings' && (
+              <SettingsView
+                lang={lang}
+                onLanguageChange={handleLanguageChange}
+                theme={theme}
+                onThemeToggle={handleThemeToggle}
+                onThemeChange={handleThemeChange}
+                user={user}
+                onSignIn={handleSignIn}
+                onSignOut={handleSignOut}
+                transactions={transactions}
+                categories={allCategories}
+                onImportData={handleImportData}
+                onResetSampleData={handleResetSampleData}
+                onClearAllData={handleClearAllData}
+                onOpenPdfExport={() => handleOpenPdfExport('all')}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -438,6 +524,17 @@ export default function App() {
           setCurrentTab(tab);
         }}
         lang={lang}
+      />
+
+      {/* Interactive PDF Export Modal */}
+      <PdfExportModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        transactions={transactions}
+        categories={allCategories}
+        lang={lang}
+        user={user}
+        initialPeriod={pdfInitialPeriod}
       />
     </div>
   );

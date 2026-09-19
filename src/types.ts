@@ -31,3 +31,32 @@ export interface UserSettings {
   currency: string;
   theme: ThemeMode;
 }
+
+export interface SystemAnnouncement {
+  isActive: boolean;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success';
+  updatedAt?: number;
+}
+
+export interface SystemConfig {
+  maintenanceMode: boolean;
+  maintenanceMessage?: string;
+  appName?: string;
+  updatedAt?: number;
+}
+
+export interface SystemAdminUser {
+  email: string;
+  addedAt: number;
+  addedBy?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  lastLoginAt: number;
+}

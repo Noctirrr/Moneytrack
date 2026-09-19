@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { User } from 'firebase/auth';
 import { 
   ArrowUpRight, 
   ArrowDownLeft, 
@@ -8,7 +9,8 @@ import {
   ReceiptText, 
   ChevronRight,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  FileDown
 } from 'lucide-react';
 import { Transaction, Category, Language } from '../types';
 import { translations } from '../constants/translations';
@@ -22,6 +24,9 @@ interface DashboardViewProps {
   onNavigate: (tab: string) => void;
   onQuickAdd: () => void;
   onEditTransaction: (item: Transaction) => void;
+  onOpenPdfExport?: () => void;
+  user?: User | null;
+  onSignIn?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -31,6 +36,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
   onQuickAdd,
   onEditTransaction,
+  onOpenPdfExport,
+  user,
+  onSignIn,
 }) => {
   const t = translations[lang];
 
@@ -108,6 +116,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenPdfExport && (
+            <button
+              id="dashboard-pdf-export-btn"
+              onClick={onOpenPdfExport}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-100 text-sm font-semibold shadow-sm transition-all active:scale-95"
+              title={lang === 'th' ? 'ดาวน์โหลดรายงานสรุป PDF' : 'Download Summary PDF'}
+            >
+              <FileDown size={16} className="text-neutral-600 dark:text-neutral-300" />
+              <span>{lang === 'th' ? 'ดาวน์โหลด PDF' : 'Download PDF'}</span>
+            </button>
+          )}
           <button
             id="quick-add-btn"
             onClick={onQuickAdd}

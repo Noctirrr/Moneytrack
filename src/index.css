@@ -29,3 +29,45 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* Print Optimization for PDF Export */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  /* Hide all app shells, navigation, modals backdrop during print */
+  #app-header,
+  #mobile-bottom-nav,
+  main,
+  #pdf-export-modal-container > div > div:not(#pdf-print-area):not(.overflow-y-auto),
+  button,
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  #pdf-export-modal-container {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  #pdf-export-modal-container > div {
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  #pdf-print-area {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
+}
+

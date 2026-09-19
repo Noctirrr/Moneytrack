@@ -18,6 +18,8 @@ export const translations = {
     tabCategories: 'หมวดหมู่',
     tabReports: 'รายงาน',
     tabSettings: 'ตั้งค่า',
+    tabAdmin: 'หลังบ้าน',
+    adminBadge: 'ผู้ดูแลระบบ',
 
     // Dashboard
     currentBalance: 'ยอดเงินคงเหลือ',
@@ -90,6 +92,8 @@ export const translations = {
     periodDaily: 'รายวัน',
     periodWeekly: 'รายสัปดาห์',
     periodMonthly: 'รายเดือน',
+    downloadReportPdf: 'ดาวน์โหลดรายงาน (PDF)',
+    generatingPdf: 'กำลังสร้าง PDF...',
     summaryStatistics: 'สรุปสถิติประจำรอบ',
     spendingByCategory: 'สัดส่วนรายจ่ายตามหมวดหมู่',
     incomeByCategory: 'สัดส่วนรายรับตามหมวดหมู่',
@@ -135,6 +139,8 @@ export const translations = {
     tabCategories: 'Categories',
     tabReports: 'Reports',
     tabSettings: 'Settings',
+    tabAdmin: 'Admin',
+    adminBadge: 'Administrator',
 
     // Dashboard
     currentBalance: 'Net Balance',
@@ -207,6 +213,8 @@ export const translations = {
     periodDaily: 'Daily',
     periodWeekly: 'Weekly',
     periodMonthly: 'Monthly',
+    downloadReportPdf: 'Download Report (PDF)',
+    generatingPdf: 'Generating PDF...',
     summaryStatistics: 'Period Summary',
     spendingByCategory: 'Spending by Category',
     incomeByCategory: 'Income by Category',
