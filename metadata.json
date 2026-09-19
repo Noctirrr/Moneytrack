@@ -1,0 +1,6 @@
+{
+  "name": "MoneyTrack",
+  "description": "A professional personal finance and income/expense tracker for Thai users with bilingual support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

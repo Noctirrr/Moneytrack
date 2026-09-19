@@ -1,0 +1,344 @@
+import React, { useRef } from 'react';
+import { User } from 'firebase/auth';
+import { 
+  Globe, 
+  Moon, 
+  Sun, 
+  Coins, 
+  Database, 
+  Download, 
+  Upload, 
+  RefreshCcw, 
+  Trash2, 
+  CloudCheck, 
+  ShieldCheck,
+  CheckCircle2
+} from 'lucide-react';
+import { Language, ThemeMode, Transaction, Category } from '../types';
+import { translations } from '../constants/translations';
+import firebaseConfig from '../../firebase-applet-config.json';
+
+interface SettingsViewProps {
+  lang: Language;
+  onLanguageChange: (lang: Language) => void;
+  theme: ThemeMode;
+  onThemeToggle: () => void;
+  onThemeChange?: (theme: ThemeMode) => void;
+  user: User | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  transactions: Transaction[];
+  categories: Category[];
+  onImportData: (data: { transactions: Transaction[]; categories?: Category[] }) => void;
+  onResetSampleData: () => void;
+  onClearAllData: () => void;
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = ({
+  lang,
+  onLanguageChange,
+  theme,
+  onThemeToggle,
+  onThemeChange,
+  user,
+  onSignIn,
+  onSignOut,
+  transactions,
+  categories,
+  onImportData,
+  onResetSampleData,
+  onClearAllData,
+}) => {
+  const t = translations[lang];
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Export JSON file
+  const handleExport = () => {
+    const data = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      appName: 'MoneyTrack',
+      transactions,
+      customCategories: categories.filter((c) => c.isCustom),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `moneytrack-backup-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Import JSON file
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.transactions && Array.isArray(json.transactions)) {
+          onImportData({
+            transactions: json.transactions,
+            categories: json.customCategories || [],
+          });
+          alert(lang === 'th' ? 'นำเข้าข้อมูลสำเร็จ' : 'Data imported successfully');
+        } else {
+          alert(lang === 'th' ? 'รูปแบบไฟล์ไม่ถูกต้อง' : 'Invalid data format');
+        }
+      } catch (err) {
+        alert(lang === 'th' ? 'ไม่สามารถอ่านไฟล์ได้' : 'Failed to parse JSON file');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  return (
+    <div id="settings-view" className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="pb-2 border-b border-neutral-200 dark:border-neutral-800">
+        <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
+          {t.settingsTitle}
+        </h1>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+          {lang === 'th' ? 'ปรับแต่งการตั้งค่าภาษา ธีม และการสำรองข้อมูลของคุณ' : 'Preferences, theme, language, and data backups'}
+        </p>
+      </div>
+
+      {/* Account / Cloud Status */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/80 dark:border-neutral-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 flex items-center justify-center">
+              <Database size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                {user ? user.displayName || user.email : t.guestMode}
+              </h3>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                {user ? `${t.signedInAs} ${user.email}` : t.syncNotice}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            {user ? (
+              <button
+                id="settings-signout-btn"
+                onClick={onSignOut}
+                className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+              >
+                {t.signOut}
+              </button>
+            ) : (
+              <button
+                id="settings-signin-btn"
+                onClick={onSignIn}
+                className="px-4 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold shadow-sm hover:opacity-90 transition-all"
+              >
+                {t.signInWithGoogle}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center gap-2 text-xs text-neutral-500">
+          <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+          <span>{t.dataSavedInFirebase} (Project: <code>{firebaseConfig.projectId}</code>)</span>
+        </div>
+      </div>
+
+      {/* General Preferences: Language, Theme, Currency */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-sm divide-y divide-neutral-100 dark:divide-neutral-800/80">
+        {/* Language */}
+        <div className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
+              <Globe size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                {t.languageSetting}
+              </p>
+              <p className="text-xs text-neutral-500">
+                {lang === 'th' ? 'ภาษาไทย (ค่าเริ่มต้น)' : 'English (Selected)'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
+            <button
+              id="set-lang-th"
+              onClick={() => onLanguageChange('th')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                lang === 'th'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              ไทย (TH)
+            </button>
+            <button
+              id="set-lang-en"
+              onClick={() => onLanguageChange('en')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                lang === 'en'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              English (EN)
+            </button>
+          </div>
+        </div>
+
+        {/* Currency */}
+        <div className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
+              <Coins size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                {t.currencySetting}
+              </p>
+              <p className="text-xs text-neutral-500">
+                {t.currencyDesc}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold px-3 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+            THB (฿)
+          </span>
+        </div>
+
+        {/* Theme */}
+        <div className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300">
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                {t.themeSetting}
+              </p>
+              <p className="text-xs text-neutral-500">
+                {theme === 'dark' ? t.themeDark : t.themeLight}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
+            <button
+              id="set-theme-light"
+              onClick={() => {
+                if (onThemeChange) {
+                  onThemeChange('light');
+                } else if (theme === 'dark') {
+                  onThemeToggle();
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                theme === 'light'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              <Sun size={14} className={theme === 'light' ? 'text-amber-500' : ''} />
+              <span>{t.themeLight}</span>
+            </button>
+            <button
+              id="set-theme-dark"
+              onClick={() => {
+                if (onThemeChange) {
+                  onThemeChange('dark');
+                } else if (theme === 'light') {
+                  onThemeToggle();
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                theme === 'dark'
+                  ? 'bg-neutral-900 text-white shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              <Moon size={14} className={theme === 'dark' ? 'text-neutral-200' : ''} />
+              <span>{t.themeDark}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Management Section */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/80 dark:border-neutral-800 shadow-sm space-y-4">
+        <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+          {t.dataManagement}
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          {/* Export JSON */}
+          <button
+            id="export-data-btn"
+            onClick={handleExport}
+            className="flex items-center justify-center gap-2 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition-colors"
+          >
+            <Download size={16} />
+            <span>{t.exportData}</span>
+          </button>
+
+          {/* Import JSON */}
+          <div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              id="import-data-btn"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition-colors"
+            >
+              <Upload size={16} />
+              <span>{t.importData}</span>
+            </button>
+          </div>
+
+          {/* Reset to Sample Data */}
+          <button
+            id="reset-sample-btn"
+            onClick={() => {
+              if (confirm(lang === 'th' ? 'ต้องการโหลดข้อมูลตัวอย่างเริ่มต้นใช่หรือไม่?' : 'Reset to initial sample transactions?')) {
+                onResetSampleData();
+              }
+            }}
+            className="flex items-center justify-center gap-2 p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition-colors"
+          >
+            <RefreshCcw size={16} />
+            <span>{t.resetToSampleData}</span>
+          </button>
+
+          {/* Clear All Data */}
+          <button
+            id="clear-all-data-btn"
+            onClick={() => {
+              if (confirm(t.clearDataConfirm)) {
+                onClearAllData();
+              }
+            }}
+            className="flex items-center justify-center gap-2 p-3 rounded-xl border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold text-rose-600 dark:text-rose-400 transition-colors"
+          >
+            <Trash2 size={16} />
+            <span>{t.clearAllData}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
