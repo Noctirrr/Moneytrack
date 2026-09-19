@@ -73,29 +73,32 @@ export async function generateFinancialReportPDF({
     minute: '2-digit',
   });
 
-  // Limit to 45 transactions for PDF export
+  // Limit to 35 transactions for PDF export to guarantee optimal performance and fit within mobile canvas limits
   const sortedTransactions = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt)
-    .slice(0, 45);
+    .slice(0, 35);
 
-  // 2. Build DOM container for high-res rendering
-  // Note: We use position: fixed; left: -9999px; top: 0; opacity: 1;
-  // This ensures html2canvas renders all text and backgrounds crisp on mobile and desktop web without showing it on screen.
-  const container = document.createElement('div');
-  container.id = 'pdf-export-hidden-dom';
-  container.style.position = 'fixed';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '794px'; // Standard A4 width at 96 DPI
-  container.style.minHeight = '1123px';
-  container.style.zIndex = '-9999';
-  container.style.opacity = '1';
-  container.style.pointerEvents = 'none';
-  container.style.backgroundColor = '#ffffff';
-  container.style.color = '#0f172a';
-  container.style.fontFamily = "'Sarabun', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  container.style.padding = '36px 40px';
-  container.style.boxSizing = 'border-box';
+  // 2. Build DOM container in an isolated iframe to completely shield html2canvas from Tailwind CSS v4's oklch variables
+  const overlay = document.createElement('div');
+  overlay.id = 'pdf-export-loading-overlay';
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.75)';
+  overlay.style.backdropFilter = 'blur(6px)';
+  overlay.style.zIndex = '999998';
+  overlay.style.display = 'flex';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.innerHTML = `
+    <div style="background: #ffffff; padding: 22px 30px; border-radius: 20px; font-family: 'Sarabun', system-ui, sans-serif; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); max-width: 90vw;">
+      <div style="font-size: 32px; margin-bottom: 8px;">📄</div>
+      <div style="font-weight: 800; font-size: 16px; color: #0f172a;">${lang === 'th' ? 'กำลังจัดทำรายงาน PDF...' : 'Generating PDF Document...'}</div>
+      <div style="font-size: 12.5px; color: #64748b; margin-top: 4px;">${lang === 'th' ? 'ระบบกำลังประมวลผลข้อมูล โปรดรอสักครู่' : 'Rendering high-resolution report, please wait'}</div>
+    </div>
+  `;
 
   const titleTh = 'รายงานสรุปบัญชีรายรับ-รายจ่าย';
   const titleEn = 'Financial Summary Report';
@@ -103,7 +106,7 @@ export async function generateFinancialReportPDF({
     ? 'สรุปภาพรวมรายรับ รายจ่าย เงินคงเหลือ และประวัติการทำรายการ' 
     : 'Summary of income, expenditure, net balance, and transaction history';
 
-  container.innerHTML = `
+  const reportInnerHtml = `
     <div style="border-bottom: 2px solid #0f172a; padding-bottom: 18px; margin-bottom: 22px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
@@ -252,19 +255,79 @@ export async function generateFinancialReportPDF({
     </div>
   `;
 
-  document.body.appendChild(container);
+  // Create isolated iframe to guarantee no Tailwind v4 CSS variables or oklch colors are parsed by html2canvas
+  const iframe = document.createElement('iframe');
+  iframe.id = 'pdf-render-isolated-frame';
+  iframe.style.position = 'fixed';
+  iframe.style.left = '0';
+  iframe.style.top = '0';
+  iframe.style.width = '794px';
+  iframe.style.height = '1123px';
+  iframe.style.border = 'none';
+  iframe.style.zIndex = '999997';
+  iframe.style.backgroundColor = '#ffffff';
+  iframe.style.opacity = '1';
+  iframe.style.pointerEvents = 'none';
+
+  document.body.appendChild(iframe);
+  document.body.appendChild(overlay);
 
   try {
-    // Wait briefly for fonts and layout
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!frameDoc) throw new Error('Cannot access PDF generation frame');
 
-    const canvas = await html2canvas(container, {
-      scale: 2,
+    frameDoc.open();
+    frameDoc.write(`
+      <!DOCTYPE html>
+      <html lang="${lang}">
+        <head>
+          <meta charset="utf-8">
+          <title>MoneyTrack Financial Report</title>
+          <style>
+            * { box-sizing: border-box; }
+            html, body {
+              margin: 0;
+              padding: 0;
+              background-color: #ffffff;
+              color: #0f172a;
+              font-family: 'Sarabun', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="pdf-report-root" style="width: 794px; min-height: 1123px; padding: 36px 40px; background-color: #ffffff; color: #0f172a; box-sizing: border-box;">
+            ${reportInnerHtml}
+          </div>
+        </body>
+      </html>
+    `);
+    frameDoc.close();
+
+    // Wait briefly for layout inside the isolated frame
+    await new Promise((resolve) => setTimeout(resolve, 180));
+
+    const targetElement = frameDoc.getElementById('pdf-report-root') || frameDoc.body;
+
+    // High compatibility html2canvas options safe from oklch error
+    const canvas = await html2canvas(targetElement, {
+      scale: 1.5,
       useCORS: true,
+      allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
-      windowWidth: 1024,
       width: 794,
+      windowWidth: 794,
+      onclone: (clonedDoc) => {
+        // Strip any unexpected style tags that contain oklch
+        const styles = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+        styles.forEach((s) => {
+          if (s.textContent && s.textContent.includes('oklch')) {
+            s.remove();
+          }
+        });
+      },
     });
 
     const imgData = canvas.toDataURL('image/png');
@@ -279,7 +342,7 @@ export async function generateFinancialReportPDF({
     pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
     heightLeft -= pageHeight;
 
-    while (heightLeft > 0) {
+    while (heightLeft > 5) {
       position = heightLeft - pdfHeight;
       pdf.addPage();
       pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
@@ -289,28 +352,57 @@ export async function generateFinancialReportPDF({
     const dateFileStr = now.toISOString().split('T')[0];
     const fileName = `MoneyTrack_Report_${period}_${dateFileStr}.pdf`;
 
-    // Create Blob for reliable universal download (works on Safari iOS & Desktop)
+    // Create Blob for reliable universal download (works on Safari iOS, Android & Desktop)
     const pdfBlob = pdf.output('blob');
     const blobUrl = URL.createObjectURL(pdfBlob);
 
-    // Auto trigger download link
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.href = blobUrl;
-    downloadAnchor.download = fileName;
-    downloadAnchor.style.display = 'none';
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
+    // Universal download trigger: iOS Safari vs Desktop/Android
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
 
-    setTimeout(() => {
-      if (document.body.contains(downloadAnchor)) {
-        document.body.removeChild(downloadAnchor);
+    if (isIOS) {
+      // In iOS Safari, open directly or popup for native iOS viewer / save to files
+      try {
+        const opened = window.open(blobUrl, '_blank');
+        if (!opened) {
+          // If popup blocked, fallback to standard anchor
+          const downloadAnchor = document.createElement('a');
+          downloadAnchor.href = blobUrl;
+          downloadAnchor.download = fileName;
+          downloadAnchor.target = '_blank';
+          document.body.appendChild(downloadAnchor);
+          downloadAnchor.click();
+          setTimeout(() => {
+            if (document.body.contains(downloadAnchor)) document.body.removeChild(downloadAnchor);
+          }, 1500);
+        }
+      } catch (e) {
+        console.warn('iOS window.open fallback:', e);
       }
-    }, 1500);
+    } else {
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = blobUrl;
+      downloadAnchor.download = fileName;
+      downloadAnchor.style.display = 'none';
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+
+      setTimeout(() => {
+        if (document.body.contains(downloadAnchor)) {
+          document.body.removeChild(downloadAnchor);
+        }
+      }, 1500);
+    }
 
     return { blobUrl, fileName };
   } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
+    }
+    if (document.body.contains(overlay)) {
+      document.body.removeChild(overlay);
     }
   }
 }

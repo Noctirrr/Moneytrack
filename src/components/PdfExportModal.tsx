@@ -126,8 +126,12 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 5000);
     } catch (err: any) {
-      console.error('PDF Generation failed:', err);
-      setErrorMessage(lang === 'th' ? 'เกิดข้อผิดพลาดในการสร้าง PDF กรุณาลองใหม่อีกครั้ง หรือใช้ปุ่มพิมพ์รายงาน' : 'Failed to generate PDF. Please try again or use Print to PDF.');
+      console.error('PDF Generation error:', err);
+      setErrorMessage(
+        lang === 'th' 
+          ? `ไม่สามารถบันทึกไฟล์อัตโนมัติได้ (${err?.message || 'ข้อจำกัดของเบราว์เซอร์'}) แนะนำให้กดปุ่ม "พิมพ์ / บันทึกเป็น PDF" ด้านบนเพื่อบันทึกไฟล์ได้ทันทีครับ`
+          : `Direct file generation restricted (${err?.message || 'Browser policy'}). Please click "Print / Save as PDF" above instead.`
+      );
     } finally {
       setIsGenerating(false);
     }

@@ -60,6 +60,14 @@
     background: transparent !important;
   }
 
+  #pdf-export-modal-container .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
   #pdf-print-area {
     box-shadow: none !important;
     border: none !important;
