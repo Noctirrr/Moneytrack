@@ -10,18 +10,26 @@ import {
   Trash2, 
   Edit3, 
   Info,
-  Calendar
+  Calendar,
+  ShieldAlert,
+  Lightbulb,
+  ChevronRight,
+  PieChart,
+  Flame
 } from 'lucide-react';
-import { Budget, Category, Transaction, Language } from '../types';
+import { Budget, Category, Transaction, Language, Wallet } from '../types';
 import { translations } from '../constants/translations';
-import { calculateBudgetProgress } from '../utils/finance';
+import { calculateBudgetProgress, calculateWalletBalances } from '../utils/finance';
 import { CategoryIcon } from './CategoryIcon';
+import { OverBudgetGuidanceModal } from './OverBudgetGuidanceModal';
 
 interface BudgetsViewProps {
   budgets: Budget[];
   categories: Category[];
   transactions: Transaction[];
   lang: Language;
+  wallets?: Wallet[];
+  onNavigateToWallets?: () => void;
   onSaveBudget: (budget: Omit<Budget, 'id' | 'createdAt'> & { id?: string }) => Promise<void>;
   onDeleteBudget: (budgetId: string) => Promise<void>;
 }
@@ -31,6 +39,8 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   categories,
   transactions,
   lang,
+  wallets = [],
+  onNavigateToWallets,
   onSaveBudget,
   onDeleteBudget,
 }) => {
@@ -41,10 +51,12 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   const currentMonthKey = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
 
   const budgetProgress = calculateBudgetProgress(budgets, transactions, categories, currentDate);
+  const { totalNetWorth } = calculateWalletBalances(wallets, transactions);
 
   // Modals
   const [isTotalBudgetModalOpen, setIsTotalBudgetModalOpen] = useState(false);
   const [isCategoryBudgetModalOpen, setIsCategoryBudgetModalOpen] = useState(false);
+  const [isGuidanceModalOpen, setIsGuidanceModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
   // Form states
@@ -134,7 +146,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   return (
     <div id="budgets-view" className="space-y-6">
       {/* Overview Pacing Card */}
-      <div className="bg-white dark:bg-neutral-900 rounded-3xl p-6 sm:p-8 border border-neutral-200/80 dark:border-neutral-800 shadow-sm relative overflow-hidden">
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 sm:p-7 border border-neutral-200/80 dark:border-neutral-800 shadow-xs relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
@@ -188,11 +200,26 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            {budgetProgress.hasBudget && (
+              <button
+                id="view-budget-guidance-btn"
+                onClick={() => setIsGuidanceModalOpen(true)}
+                className={`inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-95 ${
+                  budgetProgress.status === 'danger'
+                    ? 'bg-rose-100 hover:bg-rose-200/80 text-rose-800 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-200 border border-rose-300 dark:border-rose-800'
+                    : 'bg-neutral-100 hover:bg-neutral-200/80 text-neutral-800 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-neutral-200'
+                }`}
+              >
+                <Lightbulb size={15} className={budgetProgress.status === 'danger' ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-500'} />
+                <span>{t.viewAdvicePlaybookBtn}</span>
+              </button>
+            )}
+
             <button
               id="set-total-budget-btn"
               onClick={handleOpenTotalBudgetModal}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 text-xs sm:text-sm font-semibold transition-all active:scale-95 shadow-sm"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 text-xs sm:text-sm font-semibold transition-all active:scale-95 shadow-sm"
             >
               <Target size={15} />
               <span>{budgetProgress.hasBudget ? t.editBudget : t.setBudgetBtn}</span>
@@ -281,6 +308,73 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Over-Budget Emergency Action Box (appears when in danger or warning) */}
+      {budgetProgress.hasBudget && (budgetProgress.status === 'danger' || budgetProgress.categoryBudgets.some((cb) => cb.isOver)) && (
+        <div 
+          id="over-budget-rescue-banner"
+          className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-rose-50 via-white to-amber-50 dark:from-rose-950/40 dark:via-neutral-900 dark:to-amber-950/20 border border-rose-200 dark:border-rose-900/60 shadow-xs"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-xs">
+                <ShieldAlert size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm sm:text-base font-bold text-rose-950 dark:text-rose-200">
+                    {t.overBudgetAlertBanner}
+                  </h4>
+                </div>
+                <p className="text-xs text-rose-800/80 dark:text-rose-300/80 mt-0.5">
+                  {t.overBudgetBannerSub} • {lang === 'th' ? `เหลืออีก ${budgetProgress.daysRemaining} วัน` : `${budgetProgress.daysRemaining} days left in month`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              id="open-rescue-modal-from-banner"
+              onClick={() => setIsGuidanceModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-all active:scale-95 shadow-xs flex-shrink-0"
+            >
+              <Lightbulb size={15} />
+              <span>{t.viewAdvicePlaybookBtn}</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Quick Survival Allocation Teaser */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-rose-200/60 dark:border-rose-900/40 text-xs">
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-neutral-800/60 border border-rose-100 dark:border-neutral-700/40">
+              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block">
+                {t.emergencyDailyCap}
+              </span>
+              <span className="text-base font-extrabold text-neutral-900 dark:text-white mt-0.5 block">
+                ฿{Math.max(0, Math.floor(totalNetWorth / Math.max(1, budgetProgress.daysRemaining))).toLocaleString()}{' '}
+                <span className="text-[10px] font-normal text-neutral-400">/ วัน</span>
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-neutral-800/60 border border-rose-100 dark:border-neutral-700/40">
+              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block">
+                {lang === 'th' ? 'สูตรจัดเงินที่เหลือ' : 'Survival Formula'}
+              </span>
+              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 mt-0.5 block">
+                70% อาหาร | 20% เดินทาง | 10% ฉุกเฉิน
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-neutral-800/60 border border-rose-100 dark:border-neutral-700/40">
+              <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 block">
+                {lang === 'th' ? 'ข้อห้ามสำคัญทันที' : 'Priority Rule'}
+              </span>
+              <span className="text-xs font-bold text-rose-700 dark:text-rose-400 mt-0.5 block">
+                {lang === 'th' ? 'งดช้อปปิ้ง & ของฟุ่มเฟือย 100%' : 'Freeze 100% non-essentials'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Budgets List */}
       <div>
@@ -579,6 +673,18 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal: Over-Budget Guidance & Survival Allocation */}
+      <OverBudgetGuidanceModal
+        isOpen={isGuidanceModalOpen}
+        onClose={() => setIsGuidanceModalOpen(false)}
+        budgetProgress={budgetProgress}
+        wallets={wallets}
+        transactions={transactions}
+        categories={categories}
+        lang={lang}
+        onNavigateToWallets={onNavigateToWallets}
+      />
     </div>
   );
 };

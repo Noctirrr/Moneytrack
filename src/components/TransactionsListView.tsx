@@ -198,35 +198,35 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
 
       {/* Filter and Search Panel */}
       <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/80 dark:border-neutral-800 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           {/* Search bar */}
-          <div className="relative lg:col-span-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+          <div className="relative sm:col-span-2 lg:col-span-4">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
             <input
               id="tx-search-input"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.searchPlaceholder}
-              className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200"
+              className="w-full pl-9 pr-8 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-xs sm:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200"
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-0.5"
               >
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
           </div>
 
           {/* Type filter */}
-          <div>
+          <div className="lg:col-span-2">
             <select
               id="filter-type-select"
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-xs sm:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
             >
               <option value="all">{t.allTypes}</option>
               <option value="income">{t.typeIncome}</option>
@@ -237,12 +237,12 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
 
           {/* Wallet filter */}
           {wallets.length > 0 && (
-            <div>
+            <div className="lg:col-span-2">
               <select
                 id="filter-wallet-select"
                 value={selectedWallet}
                 onChange={(e) => setSelectedWallet(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
+                className="w-full px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-xs sm:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
               >
                 <option value="all">{t.allWallets}</option>
                 {wallets.map((w) => (
@@ -255,12 +255,12 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
           )}
 
           {/* Category filter */}
-          <div>
+          <div className={wallets.length > 0 ? 'lg:col-span-2' : 'lg:col-span-4'}>
             <select
               id="filter-category-select"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-xs sm:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
             >
               <option value="all">{t.allCategories}</option>
               {categories.map((c) => (
@@ -272,12 +272,12 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
           </div>
 
           {/* Date range filter */}
-          <div>
+          <div className="lg:col-span-2">
             <select
               id="filter-date-select"
               value={selectedDateRange}
               onChange={(e) => setSelectedDateRange(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-xs sm:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
             >
               <option value="all">{t.allDates}</option>
               <option value="thisMonth">{t.thisMonth}</option>

@@ -668,6 +668,8 @@ export default function App() {
                 categories={allCategories}
                 transactions={transactions}
                 lang={lang}
+                wallets={wallets}
+                onNavigateToWallets={() => setCurrentTab('wallets')}
                 onSaveBudget={handleSaveBudget}
                 onDeleteBudget={handleDeleteBudget}
               />

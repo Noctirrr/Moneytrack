@@ -184,7 +184,7 @@ export const WalletsView: React.FC<WalletsViewProps> = ({
   return (
     <div id="wallets-view" className="space-y-6">
       {/* Top Banner: Total Assets & Quick Transfer */}
-      <div className="bg-white dark:bg-neutral-900 rounded-3xl p-6 sm:p-8 border border-neutral-200/80 dark:border-neutral-800 shadow-sm relative overflow-hidden">
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 sm:p-7 border border-neutral-200/80 dark:border-neutral-800 shadow-xs relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
