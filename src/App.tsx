@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, loginWithGoogle, logoutUser } from './firebase';
-import { Transaction, Category, Language, ThemeMode, SystemAnnouncement, SystemConfig } from './types';
+import { Transaction, Category, Language, ThemeMode, SystemAnnouncement, SystemConfig, Wallet, Budget } from './types';
 import { DEFAULT_CATEGORIES } from './constants/categories';
+import { DEFAULT_WALLETS } from './constants/wallets';
 import { getSampleTransactions } from './constants/sampleData';
 import { translations } from './constants/translations';
 import { Header } from './components/Header';
@@ -13,6 +14,8 @@ import { TransactionsListView } from './components/TransactionsListView';
 import { CategoriesView } from './components/CategoriesView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
+import { WalletsView } from './components/WalletsView';
+import { BudgetsView } from './components/BudgetsView';
 import { PdfExportModal } from './components/PdfExportModal';
 import { AnnouncementBanner } from './components/AnnouncementBanner';
 import { Activity } from 'lucide-react';
@@ -27,11 +30,19 @@ import {
   subscribeToSystemAnnouncement,
   subscribeToSystemConfig,
   subscribeToGlobalCategories,
+  subscribeToWallets,
+  saveWalletToFirestore,
+  deleteWalletFromFirestore,
+  subscribeToBudgets,
+  saveBudgetToFirestore,
+  deleteBudgetFromFirestore,
   recordUserProfile
 } from './services/firestoreService';
 
 const LOCAL_STORAGE_TX_KEY = 'moneytrack_transactions';
 const LOCAL_STORAGE_CAT_KEY = 'moneytrack_custom_categories';
+const LOCAL_STORAGE_WALLETS_KEY = 'moneytrack_wallets';
+const LOCAL_STORAGE_BUDGETS_KEY = 'moneytrack_budgets';
 const LOCAL_STORAGE_LANG_KEY = 'moneytrack_language';
 const LOCAL_STORAGE_THEME_KEY = 'moneytrack_theme';
 const LOCAL_STORAGE_WIPED_KEY = 'moneytrack_wiped_samples_v3';
@@ -41,7 +52,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Navigation tab: 'dashboard' | 'transactions' | 'add' | 'categories' | 'reports' | 'settings'
+  // Navigation tab: 'dashboard' | 'transactions' | 'budgets' | 'wallets' | 'add' | 'categories' | 'reports' | 'settings'
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
@@ -87,6 +98,34 @@ export default function App() {
     return [...sourceGlobal, ...customCategories];
   }, [globalCategories, customCategories]);
 
+  // State: Wallets
+  const [wallets, setWallets] = useState<Wallet[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_WALLETS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached wallets', e);
+    }
+    return DEFAULT_WALLETS;
+  });
+
+  // State: Budgets
+  const [budgets, setBudgets] = useState<Budget[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_BUDGETS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached budgets', e);
+    }
+    return [];
+  });
+
   // Subscribe to system-wide collections
   useEffect(() => {
     const unsubAnn = subscribeToSystemAnnouncement((ann) => {
@@ -111,7 +150,6 @@ export default function App() {
   // State: Transactions (defaults to empty so user starts clean to add new records)
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
-      // Wipe initial sample data on first run of this update
       const hasWiped = localStorage.getItem(LOCAL_STORAGE_WIPED_KEY);
       if (!hasWiped) {
         localStorage.setItem(LOCAL_STORAGE_WIPED_KEY, 'true');
@@ -183,6 +221,8 @@ export default function App() {
     if (!user) {
       // Store local offline data
       localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(transactions));
+      localStorage.setItem(LOCAL_STORAGE_WALLETS_KEY, JSON.stringify(wallets));
+      localStorage.setItem(LOCAL_STORAGE_BUDGETS_KEY, JSON.stringify(budgets));
       return;
     }
 
@@ -192,19 +232,6 @@ export default function App() {
       user.uid,
       async (remoteTxs) => {
         setIsSyncing(false);
-        // If Firestore contains old sample transactions from previous turns, wipe them once so user can start fresh
-        const wipedUserKey = 'moneytrack_wiped_remote_v3_' + user.uid;
-        const hasSampleOnly = remoteTxs && remoteTxs.length > 0 && remoteTxs.every((t) => t.id.startsWith('sample-'));
-        if (hasSampleOnly && !localStorage.getItem(wipedUserKey)) {
-          localStorage.setItem(wipedUserKey, 'true');
-          try {
-            await clearAllTransactionsFromFirestore(user.uid);
-          } catch (e) {
-            console.warn('Failed to clean remote samples', e);
-          }
-          setTransactions([]);
-          return;
-        }
         setTransactions(remoteTxs || []);
       },
       (err) => {
@@ -220,9 +247,30 @@ export default function App() {
       }
     });
 
+    // Subscribe to Wallets in Firestore
+    const unsubWallets = subscribeToWallets(user.uid, async (remoteWallets) => {
+      if (remoteWallets && remoteWallets.length > 0) {
+        setWallets(remoteWallets);
+      } else {
+        // First-time cloud user: bootstrap default wallets
+        for (const w of DEFAULT_WALLETS) {
+          await saveWalletToFirestore(user.uid, w);
+        }
+      }
+    });
+
+    // Subscribe to Budgets in Firestore
+    const unsubBudgets = subscribeToBudgets(user.uid, (remoteBudgets) => {
+      if (remoteBudgets) {
+        setBudgets(remoteBudgets);
+      }
+    });
+
     return () => {
       unsubTx();
       unsubCat();
+      unsubWallets();
+      unsubBudgets();
     };
   }, [user]);
 
@@ -230,6 +278,9 @@ export default function App() {
   const handleSaveTransaction = async (
     data: Omit<Transaction, 'id' | 'createdAt'> & { id?: string }
   ) => {
+    const defaultWalletId = wallets.find((w) => w.isDefault)?.id || wallets[0]?.id || 'wallet-cash';
+    const effectiveWalletId = data.walletId || defaultWalletId;
+
     if (user) {
       await saveTransactionToFirestore(
         user.uid,
@@ -238,6 +289,8 @@ export default function App() {
           amount: data.amount,
           categoryId: data.categoryId,
           categoryName: data.categoryName || '',
+          walletId: effectiveWalletId,
+          ...(data.toWalletId ? { toWalletId: data.toWalletId } : {}),
           date: data.date,
           note: data.note || '',
           ...(data.id ? { id: data.id } : {}),
@@ -255,21 +308,33 @@ export default function App() {
       // Offline / Local mode
       if (data.id) {
         // Edit existing
-        setTransactions((prev) =>
-          prev.map((item) =>
+        setTransactions((prev) => {
+          const next = prev.map((item) =>
             item.id === data.id
-              ? { ...item, ...data, updatedAt: Date.now() }
+              ? { 
+                  ...item, 
+                  ...data, 
+                  walletId: effectiveWalletId,
+                  updatedAt: Date.now() 
+                }
               : item
-          )
-        );
+          );
+          localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(next));
+          return next;
+        });
       } else {
         // Create new
         const newTx: Transaction = {
           ...data,
+          walletId: effectiveWalletId,
           id: 'tx-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
           createdAt: Date.now(),
         };
-        setTransactions((prev) => [newTx, ...prev]);
+        setTransactions((prev) => {
+          const next = [newTx, ...prev];
+          localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(next));
+          return next;
+        });
       }
     }
 
@@ -282,7 +347,138 @@ export default function App() {
     if (user) {
       await deleteTransactionFromFirestore(user.uid, id);
     } else {
-      setTransactions((prev) => prev.filter((item) => item.id !== id));
+      setTransactions((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  // Handle Save Wallet
+  const handleSaveWallet = async (walletData: Omit<Wallet, 'id' | 'createdAt'> & { id?: string }) => {
+    if (user) {
+      await saveWalletToFirestore(user.uid, walletData);
+    } else {
+      if (walletData.id) {
+        setWallets((prev) => {
+          const next = prev.map((w) =>
+            w.id === walletData.id
+              ? { ...w, ...walletData, updatedAt: Date.now() }
+              : walletData.isDefault ? { ...w, isDefault: false } : w
+          );
+          localStorage.setItem(LOCAL_STORAGE_WALLETS_KEY, JSON.stringify(next));
+          return next;
+        });
+      } else {
+        const newWallet: Wallet = {
+          ...walletData,
+          id: 'wallet-' + Date.now(),
+          createdAt: Date.now(),
+        };
+        setWallets((prev) => {
+          const next = [
+            ...prev.map((w) => walletData.isDefault ? { ...w, isDefault: false } : w),
+            newWallet
+          ];
+          localStorage.setItem(LOCAL_STORAGE_WALLETS_KEY, JSON.stringify(next));
+          return next;
+        });
+      }
+    }
+  };
+
+  // Handle Delete Wallet
+  const handleDeleteWallet = async (walletId: string) => {
+    if (wallets.length <= 1) return;
+    if (user) {
+      await deleteWalletFromFirestore(user.uid, walletId);
+    } else {
+      setWallets((prev) => {
+        const next = prev.filter((w) => w.id !== walletId);
+        if (next.length > 0 && !next.some((w) => w.isDefault)) {
+          next[0].isDefault = true;
+        }
+        localStorage.setItem(LOCAL_STORAGE_WALLETS_KEY, JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  // Handle Direct Transfer between Wallets
+  const handleTransfer = async ({
+    fromWalletId,
+    toWalletId,
+    amount,
+    date,
+    note,
+  }: {
+    fromWalletId: string;
+    toWalletId: string;
+    amount: number;
+    date: string;
+    note?: string;
+  }) => {
+    const fromW = wallets.find((w) => w.id === fromWalletId);
+    const toW = wallets.find((w) => w.id === toWalletId);
+    const transferNote = note?.trim() || `${lang === 'th' ? 'โอนจาก' : 'From'} ${fromW?.name || 'Account'} ${lang === 'th' ? 'ไปยัง' : 'to'} ${toW?.name || 'Account'}`;
+
+    await handleSaveTransaction({
+      type: 'transfer',
+      amount,
+      walletId: fromWalletId,
+      toWalletId,
+      categoryId: 'cat-transfer',
+      categoryName: lang === 'th' ? 'โอนเงินระหว่างบัญชี' : 'Account Transfer',
+      date,
+      note: transferNote,
+    });
+  };
+
+  // Handle Save Budget
+  const handleSaveBudget = async (budgetData: Omit<Budget, 'id' | 'createdAt'> & { id?: string }) => {
+    if (user) {
+      await saveBudgetToFirestore(user.uid, budgetData);
+    } else {
+      if (budgetData.id) {
+        setBudgets((prev) => {
+          const next = prev.map((b) =>
+            b.id === budgetData.id
+              ? { ...b, ...budgetData, updatedAt: Date.now() }
+              : b
+          );
+          localStorage.setItem(LOCAL_STORAGE_BUDGETS_KEY, JSON.stringify(next));
+          return next;
+        });
+      } else {
+        const newBudget: Budget = {
+          ...budgetData,
+          id: 'budget-' + Date.now(),
+          createdAt: Date.now(),
+        };
+        setBudgets((prev) => {
+          // Replace if already has budget for this category and month
+          const filtered = prev.filter(
+            (b) => !(b.categoryId === budgetData.categoryId && b.monthKey === budgetData.monthKey)
+          );
+          const next = [...filtered, newBudget];
+          localStorage.setItem(LOCAL_STORAGE_BUDGETS_KEY, JSON.stringify(next));
+          return next;
+        });
+      }
+    }
+  };
+
+  // Handle Delete Budget
+  const handleDeleteBudget = async (budgetId: string) => {
+    if (user) {
+      await deleteBudgetFromFirestore(user.uid, budgetId);
+    } else {
+      setBudgets((prev) => {
+        const next = prev.filter((b) => b.id !== budgetId);
+        localStorage.setItem(LOCAL_STORAGE_BUDGETS_KEY, JSON.stringify(next));
+        return next;
+      });
     }
   };
 
@@ -427,6 +623,8 @@ export default function App() {
               <DashboardView
                 transactions={transactions}
                 categories={allCategories}
+                wallets={wallets}
+                budgets={budgets}
                 lang={lang}
                 onNavigate={(tab) => setCurrentTab(tab)}
                 onQuickAdd={() => {
@@ -438,6 +636,7 @@ export default function App() {
                   setCurrentTab('add');
                 }}
                 onOpenPdfExport={() => handleOpenPdfExport('monthly')}
+                onOpenTransfer={() => setCurrentTab('wallets')}
                 user={user}
                 onSignIn={handleSignIn}
               />
@@ -447,6 +646,7 @@ export default function App() {
               <TransactionsListView
                 transactions={transactions}
                 categories={allCategories}
+                wallets={wallets}
                 lang={lang}
                 onAddTransaction={() => {
                   setEditingTransaction(null);
@@ -462,10 +662,33 @@ export default function App() {
               />
             )}
 
+            {currentTab === 'budgets' && (
+              <BudgetsView
+                budgets={budgets}
+                categories={allCategories}
+                transactions={transactions}
+                lang={lang}
+                onSaveBudget={handleSaveBudget}
+                onDeleteBudget={handleDeleteBudget}
+              />
+            )}
+
+            {currentTab === 'wallets' && (
+              <WalletsView
+                wallets={wallets}
+                transactions={transactions}
+                lang={lang}
+                onSaveWallet={handleSaveWallet}
+                onDeleteWallet={handleDeleteWallet}
+                onTransfer={handleTransfer}
+              />
+            )}
+
             {currentTab === 'add' && (
               <AddEditTransactionView
                 initialData={editingTransaction}
                 categories={allCategories}
+                wallets={wallets}
                 lang={lang}
                 onSave={handleSaveTransaction}
                 onCancel={() => {

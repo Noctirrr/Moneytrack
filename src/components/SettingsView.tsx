@@ -12,10 +12,12 @@ import {
   Trash2, 
   CloudCheck, 
   CheckCircle2,
-  FileDown
+  FileDown,
+  LogIn
 } from 'lucide-react';
 import { Language, ThemeMode, Transaction, Category } from '../types';
 import { translations } from '../constants/translations';
+import { GoogleSignInButton } from './GoogleSignInButton';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 interface SettingsViewProps {
@@ -138,13 +140,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {t.signOut}
               </button>
             ) : (
-              <button
+              <GoogleSignInButton
                 id="settings-signin-btn"
                 onClick={onSignIn}
-                className="px-4 py-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold shadow-sm hover:opacity-90 transition-all"
-              >
-                {t.signInWithGoogle}
-              </button>
+                lang={lang}
+                variant="standard"
+              />
             )}
           </div>
         </div>

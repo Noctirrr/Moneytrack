@@ -1,4 +1,34 @@
-export type TransactionType = 'income' | 'expense';
+export type TransactionType = 'income' | 'expense' | 'transfer';
+
+export type WalletType = 'cash' | 'bank' | 'savings' | 'credit' | 'e-wallet';
+
+export interface Wallet {
+  id: string;
+  userId?: string;
+  name: string;
+  type: WalletType;
+  initialBalance: number;
+  color: string;
+  icon?: string;
+  accountNumber?: string;
+  isDefault?: boolean;
+  createdAt: number;
+  updatedAt?: number;
+}
+
+export type BudgetPeriod = 'monthly';
+
+export interface Budget {
+  id: string;
+  userId?: string;
+  categoryId?: string; // If undefined or 'total' => Total Monthly Budget limit
+  amount: number; // Limit amount
+  period: BudgetPeriod;
+  monthKey: string; // "YYYY-MM" or "all"
+  alertThreshold?: number; // e.g. 80 (80%)
+  createdAt: number;
+  updatedAt?: number;
+}
 
 export interface Category {
   id: string;
@@ -17,6 +47,8 @@ export interface Transaction {
   amount: number;
   categoryId: string;
   categoryName?: string;
+  walletId?: string; // Source wallet (where money moves out, or received in)
+  toWalletId?: string; // Destination wallet for transfers
   date: string; // YYYY-MM-DD
   note?: string;
   createdAt: number;

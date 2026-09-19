@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { db } from '../firebase';
-import { Transaction, Category, SystemAnnouncement, SystemConfig, UserProfile } from '../types';
+import { Transaction, Category, SystemAnnouncement, SystemConfig, UserProfile, Wallet, Budget } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 
 export const ADMIN_EMAIL = '0708saipin@gmail.com';
@@ -105,6 +105,8 @@ export const saveTransactionToFirestore = async (
     categoryName: transaction.categoryName || '',
     date: transaction.date,
     note: transaction.note ? String(transaction.note).trim() : '',
+    ...(transaction.walletId ? { walletId: transaction.walletId } : {}),
+    ...(transaction.toWalletId ? { toWalletId: transaction.toWalletId } : {}),
     createdAt: transaction.createdAt || Date.now(),
     updatedAt: Date.now(),
   };
@@ -369,3 +371,126 @@ export const fetchRegisteredUsers = async (): Promise<UserProfile[]> => {
     return [];
   }
 };
+
+// 6. User Wallets / Accounts
+export const subscribeToWallets = (
+  userId: string,
+  onUpdate: (wallets: Wallet[]) => void,
+  onError?: (err: any) => void
+) => {
+  const walletsRef = collection(db, 'users', userId, 'wallets');
+  const q = query(walletsRef, orderBy('createdAt', 'asc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: Wallet[] = [];
+      snapshot.forEach((d) => {
+        list.push({
+          id: d.id,
+          ...d.data(),
+        } as Wallet);
+      });
+      onUpdate(list);
+    },
+    (err) => {
+      console.error('Wallets subscription error:', err);
+      if (onError) onError(err);
+    }
+  );
+};
+
+export const saveWalletToFirestore = async (
+  userId: string,
+  wallet: Omit<Wallet, 'id' | 'createdAt'> & { id?: string; createdAt?: number }
+): Promise<string> => {
+  const walletsRef = collection(db, 'users', userId, 'wallets');
+  const docRef = wallet.id ? doc(walletsRef, wallet.id) : doc(walletsRef);
+
+  const payload: Record<string, any> = {
+    id: docRef.id,
+    userId,
+    name: wallet.name.trim(),
+    type: wallet.type,
+    initialBalance: Number(wallet.initialBalance) || 0,
+    color: wallet.color || '#10b981',
+    createdAt: wallet.createdAt || Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  if (wallet.icon) payload.icon = wallet.icon;
+  if (wallet.accountNumber) payload.accountNumber = wallet.accountNumber;
+  if (wallet.isDefault !== undefined) payload.isDefault = Boolean(wallet.isDefault);
+
+  await setDoc(docRef, payload, { merge: true });
+  return docRef.id;
+};
+
+export const deleteWalletFromFirestore = async (
+  userId: string,
+  walletId: string
+): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'wallets', walletId);
+  await deleteDoc(docRef);
+};
+
+// 7. User Budgets
+export const subscribeToBudgets = (
+  userId: string,
+  onUpdate: (budgets: Budget[]) => void,
+  onError?: (err: any) => void
+) => {
+  const budgetsRef = collection(db, 'users', userId, 'budgets');
+  const q = query(budgetsRef, orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: Budget[] = [];
+      snapshot.forEach((d) => {
+        list.push({
+          id: d.id,
+          ...d.data(),
+        } as Budget);
+      });
+      onUpdate(list);
+    },
+    (err) => {
+      console.error('Budgets subscription error:', err);
+      if (onError) onError(err);
+    }
+  );
+};
+
+export const saveBudgetToFirestore = async (
+  userId: string,
+  budget: Omit<Budget, 'id' | 'createdAt'> & { id?: string; createdAt?: number }
+): Promise<string> => {
+  const budgetsRef = collection(db, 'users', userId, 'budgets');
+  const docRef = budget.id ? doc(budgetsRef, budget.id) : doc(budgetsRef);
+
+  const payload: Record<string, any> = {
+    id: docRef.id,
+    userId,
+    amount: Number(budget.amount) || 0,
+    period: budget.period || 'monthly',
+    monthKey: budget.monthKey || 'all',
+    createdAt: budget.createdAt || Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  if (budget.categoryId) payload.categoryId = budget.categoryId;
+  if (budget.alertThreshold !== undefined) payload.alertThreshold = Number(budget.alertThreshold);
+
+  await setDoc(docRef, payload, { merge: true });
+  return docRef.id;
+};
+
+export const deleteBudgetFromFirestore = async (
+  userId: string,
+  budgetId: string
+): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'budgets', budgetId);
+  await deleteDoc(docRef);
+};
+

@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import { Globe, LogIn, LogOut, CheckCircle2, CloudOff, Sun, Moon, FileDown } from 'lucide-react';
 import { Language, ThemeMode } from '../types';
 import { translations } from '../constants/translations';
+import { GoogleSignInButton } from './GoogleSignInButton';
 
 interface HeaderProps {
   currentTab: string;
@@ -36,6 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
   const navLinks = [
     { id: 'dashboard', label: t.tabDashboard },
     { id: 'transactions', label: t.tabTransactions },
+    { id: 'budgets', label: t.tabBudgets },
+    { id: 'wallets', label: t.tabWallets },
     { id: 'add', label: t.tabAdd },
     { id: 'categories', label: t.tabCategories },
     { id: 'reports', label: t.tabReports },
@@ -152,28 +155,36 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center gap-2">
                 <div 
                   id="user-profile-badge" 
-                  className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-700 dark:text-neutral-300"
+                  className="flex items-center gap-2 pl-1.5 pr-2.5 sm:pr-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-700 dark:text-neutral-300 shadow-xs"
                 >
-                  {user.photoURL ? (
-                    <img 
-                      src={user.photoURL} 
-                      alt={user.displayName || 'User'} 
-                      className="w-5 h-5 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-neutral-300 dark:bg-neutral-600 flex items-center justify-center font-bold text-[10px]">
-                      {user.email?.charAt(0).toUpperCase()}
+                  <div className="relative flex-shrink-0">
+                    {user.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt={user.displayName || 'User'} 
+                        className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-white dark:border-neutral-700"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 flex items-center justify-center font-bold text-[10px] sm:text-[11px]">
+                        {user.email?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-neutral-800" />
+                  </div>
+                  <div className="hidden sm:block text-left min-w-0">
+                    <div className="font-semibold text-neutral-900 dark:text-white truncate max-w-[105px] text-xs">
+                      {user.displayName || user.email?.split('@')[0]}
                     </div>
-                  )}
-                  <span className="truncate max-w-[120px] font-medium">
-                    {user.displayName || user.email}
-                  </span>
-                  <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium -mt-0.5 flex items-center gap-1">
+                      <span>{lang === 'th' ? 'เชื่อมต่อแล้ว' : 'Connected'}</span>
+                    </div>
+                  </div>
                 </div>
                 <button
                   id="sign-out-btn"
                   onClick={onSignOut}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-950/30 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 dark:hover:bg-rose-950/30 dark:hover:border-rose-900/40 active:scale-95 transition-all"
                   title={t.signOut}
                 >
                   <LogOut size={14} />
@@ -181,14 +192,12 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             ) : (
-              <button
-                id="sign-in-gmail-btn"
+              <GoogleSignInButton
+                id="header-sign-in-btn"
                 onClick={onSignIn}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 active:scale-95 text-xs font-medium shadow-sm transition-all"
-              >
-                <LogIn size={14} />
-                <span>{t.signInWithGoogle}</span>
-              </button>
+                lang={lang}
+                variant="compact"
+              />
             )}
           </div>
         </div>

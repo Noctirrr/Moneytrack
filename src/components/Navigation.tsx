@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ReceiptText, PlusCircle, FolderKanban, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, PlusCircle, Target, Wallet as WalletIcon, Settings } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../constants/translations';
 
@@ -16,8 +16,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onTabChange,
     { id: 'dashboard', label: t.tabDashboard, icon: LayoutDashboard },
     { id: 'transactions', label: t.tabTransactions, icon: ReceiptText },
     { id: 'add', label: t.tabAdd, icon: PlusCircle, isHighlight: true },
-    { id: 'categories', label: t.tabCategories, icon: FolderKanban },
-    { id: 'reports', label: t.tabReports, icon: BarChart3 },
+    { id: 'budgets', label: t.tabBudgets, icon: Target },
+    { id: 'wallets', label: t.tabWallets, icon: WalletIcon },
     { id: 'settings', label: t.tabSettings, icon: Settings },
   ];
 

@@ -14,7 +14,13 @@ import {
   Heart, 
   Home, 
   Smartphone, 
-  Gift 
+  Gift,
+  Banknote,
+  Building2,
+  PiggyBank,
+  CreditCard,
+  ArrowLeftRight,
+  Wallet as WalletIcon
 } from 'lucide-react';
 
 interface CategoryIconProps {
@@ -25,6 +31,19 @@ interface CategoryIconProps {
 
 export const CategoryIcon: React.FC<CategoryIconProps> = ({ name, className = 'w-4 h-4', size = 16 }) => {
   switch (name) {
+    case 'Banknote':
+      return <Banknote className={className} size={size} />;
+    case 'Building2':
+      return <Building2 className={className} size={size} />;
+    case 'PiggyBank':
+      return <PiggyBank className={className} size={size} />;
+    case 'CreditCard':
+      return <CreditCard className={className} size={size} />;
+    case 'ArrowLeftRight':
+      return <ArrowLeftRight className={className} size={size} />;
+    case 'Wallet':
+    case 'WalletIcon':
+      return <WalletIcon className={className} size={size} />;
     case 'Utensils':
       return <Utensils className={className} size={size} />;
     case 'Car':

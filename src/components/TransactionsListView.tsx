@@ -8,11 +8,13 @@ import {
   Plus, 
   ArrowDownLeft, 
   ArrowUpRight, 
+  ArrowLeftRight,
   X,
   Receipt,
-  FileDown
+  FileDown,
+  Wallet as WalletIcon
 } from 'lucide-react';
-import { Transaction, Category, Language } from '../types';
+import { Transaction, Category, Language, Wallet } from '../types';
 import { translations } from '../constants/translations';
 import { formatCurrency, formatDateDisplay } from '../utils/format';
 import { CategoryIcon } from './CategoryIcon';
@@ -20,6 +22,7 @@ import { CategoryIcon } from './CategoryIcon';
 interface TransactionsListViewProps {
   transactions: Transaction[];
   categories: Category[];
+  wallets?: Wallet[];
   lang: Language;
   onAddTransaction: () => void;
   onEditTransaction: (item: Transaction) => void;
@@ -31,6 +34,7 @@ interface TransactionsListViewProps {
 export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
   transactions,
   categories,
+  wallets = [],
   lang,
   onAddTransaction,
   onEditTransaction,
@@ -43,6 +47,7 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedWallet, setSelectedWallet] = useState<string>('all');
   const [selectedDateRange, setSelectedDateRange] = useState<string>('all');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [showClearAllModal, setShowClearAllModal] = useState(false);
@@ -52,6 +57,12 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
     categories.forEach((c) => map.set(c.id, c));
     return map;
   }, [categories]);
+
+  const walletMap = useMemo(() => {
+    const map = new Map<string, Wallet>();
+    wallets.forEach((w) => map.set(w.id, w));
+    return map;
+  }, [wallets]);
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -65,9 +76,16 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
         return false;
       }
 
-      // Category filter
-      if (selectedCategory !== 'all' && tx.categoryId !== selectedCategory) {
-        return false;
+      // Wallet filter
+      if (selectedWallet !== 'all') {
+        const matchesWallet = tx.walletId === selectedWallet || tx.toWalletId === selectedWallet;
+        if (!matchesWallet) return false;
+      }
+
+      // Category filter (transfers don't use regular category filter unless 'all')
+      if (selectedCategory !== 'all') {
+        if (tx.type === 'transfer') return false;
+        if (tx.categoryId !== selectedCategory) return false;
       }
 
       // Date range filter
@@ -92,36 +110,43 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const cat = categoryMap.get(tx.categoryId);
+        const fromWallet = tx.walletId ? walletMap.get(tx.walletId) : undefined;
+        const toWallet = tx.toWalletId ? walletMap.get(tx.toWalletId) : undefined;
+
         const matchNote = tx.note?.toLowerCase().includes(q);
         const matchCatTh = cat?.nameTh.toLowerCase().includes(q);
         const matchCatEn = cat?.nameEn.toLowerCase().includes(q);
+        const matchFromWallet = fromWallet?.name.toLowerCase().includes(q);
+        const matchToWallet = toWallet?.name.toLowerCase().includes(q);
         const matchAmount = tx.amount.toString().includes(q);
-        if (!matchNote && !matchCatTh && !matchCatEn && !matchAmount) {
+        
+        if (!matchNote && !matchCatTh && !matchCatEn && !matchFromWallet && !matchToWallet && !matchAmount) {
           return false;
         }
       }
 
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt);
-  }, [transactions, selectedType, selectedCategory, selectedDateRange, searchQuery, categoryMap]);
+  }, [transactions, selectedType, selectedCategory, selectedWallet, selectedDateRange, searchQuery, categoryMap, walletMap]);
 
-  // Filter totals
+  // Filter totals (excluding transfers from cashflow totals)
   const filterStats = useMemo(() => {
     let income = 0;
     let expense = 0;
     filteredTransactions.forEach((tx) => {
       if (tx.type === 'income') income += tx.amount;
-      else expense += tx.amount;
+      else if (tx.type === 'expense') expense += tx.amount;
     });
     return { income, expense, balance: income - expense };
   }, [filteredTransactions]);
 
-  const hasActiveFilters = searchQuery !== '' || selectedType !== 'all' || selectedCategory !== 'all' || selectedDateRange !== 'all';
+  const hasActiveFilters = searchQuery !== '' || selectedType !== 'all' || selectedCategory !== 'all' || selectedWallet !== 'all' || selectedDateRange !== 'all';
 
   const resetFilters = () => {
     setSearchQuery('');
     setSelectedType('all');
     setSelectedCategory('all');
+    setSelectedWallet('all');
     setSelectedDateRange('all');
   };
 
@@ -173,9 +198,9 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
 
       {/* Filter and Search Panel */}
       <div className="bg-white dark:bg-neutral-900 rounded-2xl p-5 border border-neutral-200/80 dark:border-neutral-800 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Search bar */}
-          <div className="relative">
+          <div className="relative lg:col-span-1">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
             <input
               id="tx-search-input"
@@ -206,8 +231,28 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
               <option value="all">{t.allTypes}</option>
               <option value="income">{t.typeIncome}</option>
               <option value="expense">{t.typeExpense}</option>
+              <option value="transfer">{t.typeTransfer}</option>
             </select>
           </div>
+
+          {/* Wallet filter */}
+          {wallets.length > 0 && (
+            <div>
+              <select
+                id="filter-wallet-select"
+                value={selectedWallet}
+                onChange={(e) => setSelectedWallet(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200 cursor-pointer"
+              >
+                <option value="all">{t.allWallets}</option>
+                {wallets.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Category filter */}
           <div>
@@ -243,60 +288,40 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
           </div>
         </div>
 
-        {/* Filter Summary & Clear Filter */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 text-xs text-neutral-500">
+        {/* Filter Summary Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-neutral-100 dark:border-neutral-800 text-xs text-neutral-500">
           <div className="flex items-center gap-4">
             <span>
-              {t.transactionCount}: <strong className="text-neutral-900 dark:text-white">{filteredTransactions.length}</strong>
+              {t.filterResultsCount.replace('{count}', String(filteredTransactions.length))}
             </span>
-            <span>
-              {t.totalIncome}: <strong className="text-emerald-600">+{formatCurrency(filterStats.income)}</strong>
+            <span className="text-neutral-300 dark:text-neutral-700">|</span>
+            <span className="text-emerald-600 font-semibold">
+              +{formatCurrency(filterStats.income)}
             </span>
-            <span>
-              {t.totalExpense}: <strong className="text-rose-600">-{formatCurrency(filterStats.expense)}</strong>
+            <span className="text-rose-600 font-semibold">
+              -{formatCurrency(filterStats.expense)}
             </span>
           </div>
 
           {hasActiveFilters && (
             <button
-              id="clear-filters-btn"
+              id="reset-filters-btn"
               onClick={resetFilters}
-              className="text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white font-medium underline flex items-center gap-1"
+              className="text-xs font-semibold text-neutral-900 dark:text-white hover:underline flex items-center gap-1"
             >
-              {t.clearFilters}
+              <X size={12} />
+              <span>{t.clearFilters}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Transaction List */}
+      {/* Transactions List Table / Cards */}
       <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-sm overflow-hidden">
-        {transactions.length === 0 ? (
-          <div className="py-16 px-4 text-center space-y-3">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-400">
-              <Receipt size={24} />
-            </div>
-            <div>
-              <p className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
-                {t.noTransactionsYet}
-              </p>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-                {t.startAddingFirstTransaction}
-              </p>
-            </div>
-            <button
-              id="empty-list-add-tx-btn"
-              onClick={onAddTransaction}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm"
-            >
-              <Plus size={16} />
-              <span>{t.tabAdd}</span>
-            </button>
-          </div>
-        ) : filteredTransactions.length === 0 ? (
-          <div className="py-16 text-center text-neutral-400">
+        {filteredTransactions.length === 0 ? (
+          <div className="text-center py-16 px-4 text-neutral-400">
             <Receipt size={36} className="mx-auto mb-2 opacity-40" />
-            <p className="text-sm font-medium">{t.noFilteredTransactions}</p>
+            <p className="text-sm font-medium">{t.noMatchingTransactions}</p>
             {hasActiveFilters && (
               <button
                 onClick={resetFilters}
@@ -309,10 +334,20 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
         ) : (
           <div className="divide-y divide-neutral-100 dark:divide-neutral-800/80">
             {filteredTransactions.map((tx) => {
+              const isTransfer = tx.type === 'transfer';
               const cat = categoryMap.get(tx.categoryId);
-              const categoryName = cat 
+              const fromWallet = tx.walletId ? walletMap.get(tx.walletId) : undefined;
+              const toWallet = tx.toWalletId ? walletMap.get(tx.toWalletId) : undefined;
+
+              const categoryName = isTransfer
+                ? (lang === 'th' ? 'โอนเงินระหว่างบัญชี' : 'Account Transfer')
+                : cat 
                 ? (lang === 'th' ? cat.nameTh : cat.nameEn)
                 : (tx.categoryName || 'General');
+
+              const walletLabel = isTransfer
+                ? `${fromWallet?.name || 'Account'} ➔ ${toWallet?.name || 'Account'}`
+                : fromWallet ? fromWallet.name : null;
 
               return (
                 <div
@@ -324,20 +359,33 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
                     <div 
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ 
-                        backgroundColor: `${cat?.color || '#64748b'}18`,
-                        color: cat?.color || '#64748b'
+                        backgroundColor: isTransfer
+                          ? '#0284c718'
+                          : `${cat?.color || '#64748b'}18`,
+                        color: isTransfer
+                          ? '#0284c7'
+                          : cat?.color || '#64748b'
                       }}
                     >
-                      <CategoryIcon name={cat?.icon || 'Tag'} size={18} />
+                      {isTransfer ? (
+                        <ArrowLeftRight size={18} />
+                      ) : (
+                        <CategoryIcon name={cat?.icon || 'Tag'} size={18} />
+                      )}
                     </div>
                     <div className="truncate">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                           {tx.note || categoryName}
                         </span>
                         <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 flex-shrink-0">
                           {categoryName}
                         </span>
+                        {walletLabel && (
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-50 dark:bg-neutral-800/60 text-neutral-500 border border-neutral-200/60 dark:border-neutral-700/60 flex-shrink-0">
+                            {walletLabel}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex items-center gap-1.5">
                         <Calendar size={12} />
@@ -349,9 +397,13 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
                   <div className="flex items-center gap-4 flex-shrink-0 pl-3">
                     <div className="text-right">
                       <span className={`text-base font-bold tracking-tight ${
-                        tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-neutral-900 dark:text-white'
+                        isTransfer
+                          ? 'text-sky-600 dark:text-sky-400'
+                          : tx.type === 'income' 
+                          ? 'text-emerald-600 dark:text-emerald-400' 
+                          : 'text-neutral-900 dark:text-white'
                       }`}>
-                        {tx.type === 'income' ? '+' : '-'}
+                        {isTransfer ? '⇌ ' : tx.type === 'income' ? '+' : '-'}
                         {formatCurrency(tx.amount)}
                       </span>
                     </div>
@@ -415,21 +467,16 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
         </div>
       )}
 
-      {/* Clear All Transactions Confirmation Modal */}
-      {showClearAllModal && (
+      {/* Clear All Confirmation Modal */}
+      {showClearAllModal && onClearAllTransactions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-md w-full p-6 border border-neutral-200 dark:border-neutral-800 shadow-xl space-y-4">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-              <Trash2 size={20} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                {t.clearTransactionsConfirmTitle}
-              </h3>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed mt-1.5">
-                {t.clearTransactionsConfirmDesc}
-              </p>
-            </div>
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-sm w-full p-6 border border-neutral-200 dark:border-neutral-800 shadow-xl space-y-4">
+            <h3 className="text-base font-bold text-rose-600 dark:text-rose-400">
+              {t.clearAllConfirmTitle}
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              {t.clearAllConfirmDesc}
+            </p>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowClearAllModal(false)}
@@ -438,14 +485,14 @@ export const TransactionsListView: React.FC<TransactionsListViewProps> = ({
                 {t.cancelBtn}
               </button>
               <button
-                id="confirm-clear-all-modal-btn"
+                id="confirm-clear-all-btn"
                 onClick={() => {
-                  onClearAllTransactions?.();
+                  onClearAllTransactions();
                   setShowClearAllModal(false);
                 }}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-colors"
               >
-                {t.clearAllTransactions}
+                {t.clearAllBtn}
               </button>
             </div>
           </div>
