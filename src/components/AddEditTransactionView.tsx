@@ -7,11 +7,13 @@ import {
   FileText, 
   Check, 
   AlertCircle,
-  Wallet as WalletIcon
+  Wallet as WalletIcon,
+  MessageSquare
 } from 'lucide-react';
 import { Transaction, TransactionType, Category, Language, Wallet } from '../types';
 import { translations } from '../constants/translations';
 import { CategoryIcon } from './CategoryIcon';
+import { ChatTransactionView } from './ChatTransactionView';
 
 interface AddEditTransactionViewProps {
   initialData?: Transaction | null;
@@ -20,6 +22,9 @@ interface AddEditTransactionViewProps {
   lang: Language;
   onSave: (data: Omit<Transaction, 'id' | 'createdAt'> & { id?: string }) => Promise<void>;
   onCancel: () => void;
+  initialMode?: 'form' | 'chat';
+  onNavigateToDashboard?: () => void;
+  onNavigateToTransactions?: () => void;
 }
 
 export const AddEditTransactionView: React.FC<AddEditTransactionViewProps> = ({
@@ -29,8 +34,12 @@ export const AddEditTransactionView: React.FC<AddEditTransactionViewProps> = ({
   lang,
   onSave,
   onCancel,
+  initialMode = 'form',
+  onNavigateToDashboard,
+  onNavigateToTransactions,
 }) => {
   const t = translations[lang];
+  const [inputMode, setInputMode] = useState<'form' | 'chat'>(initialMode);
 
   const defaultWallet = wallets.find((w) => w.isDefault) || wallets[0];
   const secondWallet = wallets.find((w) => w.id !== defaultWallet?.id) || wallets[0];
@@ -130,8 +139,82 @@ export const AddEditTransactionView: React.FC<AddEditTransactionViewProps> = ({
     }
   };
 
+  // If in chat mode and not editing an existing transaction, render the ChatTransactionView
+  if (!initialData && inputMode === 'chat') {
+    return (
+      <div id="add-edit-transaction-chat-wrapper" className="py-2">
+        <div className="flex items-center justify-center mb-4">
+          <div className="inline-flex p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80">
+            <button
+              type="button"
+              id="switch-to-form-tab-btn"
+              onClick={() => setInputMode('form')}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-all"
+            >
+              <FileText size={13} />
+              <span>{lang === 'th' ? 'แบบฟอร์มมาตรฐาน' : 'Standard Form'}</span>
+            </button>
+            <button
+              type="button"
+              id="switch-to-chat-tab-btn"
+              onClick={() => setInputMode('chat')}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs transition-all"
+            >
+              <MessageSquare size={13} />
+              <span>{lang === 'th' ? 'แชทบันทึกรายการ' : 'Chat Record'}</span>
+            </button>
+          </div>
+        </div>
+
+        <ChatTransactionView
+          categories={categories}
+          wallets={wallets}
+          lang={lang}
+          onSave={onSave}
+          onNavigateToDashboard={onNavigateToDashboard || onCancel}
+          onNavigateToTransactions={onNavigateToTransactions || onCancel}
+          onSwitchToForm={() => setInputMode('form')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div id="add-edit-transaction-view" className="max-w-xl mx-auto py-2">
+      {/* Mode Switcher when adding a new transaction */}
+      {!initialData && (
+        <div className="flex items-center justify-center mb-4">
+          <div className="inline-flex p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80">
+            <button
+              type="button"
+              id="mode-form-tab-btn"
+              onClick={() => setInputMode('form')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                inputMode === 'form'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+              }`}
+            >
+              <FileText size={13} />
+              <span>{lang === 'th' ? 'แบบฟอร์มมาตรฐาน' : 'Standard Form'}</span>
+            </button>
+            <button
+              type="button"
+              id="mode-chat-tab-btn"
+              onClick={() => setInputMode('chat')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                inputMode === 'chat'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+              }`}
+            >
+              <MessageSquare size={13} />
+              <span>{lang === 'th' ? 'แชทบันทึกรายการ' : 'Chat Record'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-neutral-900 rounded-3xl p-6 sm:p-8 border border-neutral-200/80 dark:border-neutral-800 shadow-sm">
         {/* Header */}
         <div className="border-b border-neutral-100 dark:border-neutral-800 pb-4 mb-6">

@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Calendar,
   Lightbulb,
-  ShieldAlert
+  ShieldAlert,
+  MessageSquare
 } from 'lucide-react';
 import { Transaction, Category, Language, Wallet, Budget } from '../types';
 import { translations } from '../constants/translations';
@@ -37,6 +38,7 @@ interface DashboardViewProps {
   onEditTransaction: (item: Transaction) => void;
   onOpenPdfExport?: () => void;
   onOpenTransfer?: () => void;
+  onOpenChatRecord?: () => void;
   user?: User | null;
   onSignIn?: () => void;
 }
@@ -52,6 +54,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onEditTransaction,
   onOpenPdfExport,
   onOpenTransfer,
+  onOpenChatRecord,
 }) => {
   const t = translations[lang];
   const [isGuidanceModalOpen, setIsGuidanceModalOpen] = useState(false);
@@ -202,6 +205,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span>{t.transferMoney}</span>
             </button>
           )}
+
+          <button
+            id="dashboard-chat-add-btn"
+            onClick={onOpenChatRecord || (() => onNavigate('chat'))}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-semibold shadow-xs transition-all active:scale-95"
+            title={lang === 'th' ? 'แชทบันทึกรายการด้วยภาษาธรรมชาติ' : 'Record via chat'}
+          >
+            <MessageSquare size={14} className="text-neutral-500 dark:text-neutral-400" />
+            <span>{lang === 'th' ? 'แชทบันทึกรายการ' : 'Chat Record'}</span>
+          </button>
 
           <button
             id="quick-add-btn"

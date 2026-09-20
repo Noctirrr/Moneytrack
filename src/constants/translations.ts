@@ -21,6 +21,7 @@ export const translations = {
     tabAdmin: 'หลังบ้าน',
     tabBudgets: 'งบประมาณ',
     tabWallets: 'กระเป๋าเงิน',
+    tabChatRecord: 'แชทบันทึก',
     adminBadge: 'ผู้ดูแลระบบ',
 
     // Dashboard
@@ -223,6 +224,7 @@ export const translations = {
     tabAdmin: 'Admin',
     tabBudgets: 'Budgets',
     tabWallets: 'Wallets',
+    tabChatRecord: 'Chat Entry',
     adminBadge: 'Administrator',
 
     // Dashboard

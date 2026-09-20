@@ -14,7 +14,8 @@ import {
   BarChart3, 
   Settings as SettingsIcon,
   Tags,
-  ChevronDown
+  ChevronDown,
+  MessageSquare
 } from 'lucide-react';
 import { Language, ThemeMode } from '../types';
 import { translations } from '../constants/translations';
@@ -71,11 +72,12 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   const secondaryTabs = [
+    { id: 'chat', label: lang === 'th' ? 'แชทบันทึกรายการ' : 'Chat Record', icon: MessageSquare },
     { id: 'categories', label: t.tabCategories, icon: Tags },
     { id: 'settings', label: t.tabSettings, icon: SettingsIcon },
   ];
 
-  const isSecondaryActive = currentTab === 'categories' || currentTab === 'settings';
+  const isSecondaryActive = currentTab === 'categories' || currentTab === 'settings' || currentTab === 'chat';
 
   return (
     <header 

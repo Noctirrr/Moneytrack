@@ -18,6 +18,7 @@ import { WalletsView } from './components/WalletsView';
 import { BudgetsView } from './components/BudgetsView';
 import { PdfExportModal } from './components/PdfExportModal';
 import { AnnouncementBanner } from './components/AnnouncementBanner';
+import { ChatTransactionView } from './components/ChatTransactionView';
 import { Activity } from 'lucide-react';
 import { 
   subscribeToTransactions, 
@@ -276,7 +277,8 @@ export default function App() {
 
   // Handle Save Transaction
   const handleSaveTransaction = async (
-    data: Omit<Transaction, 'id' | 'createdAt'> & { id?: string }
+    data: Omit<Transaction, 'id' | 'createdAt'> & { id?: string },
+    navigateAfterSave: boolean = true
   ) => {
     const defaultWalletId = wallets.find((w) => w.isDefault)?.id || wallets[0]?.id || 'wallet-cash';
     const effectiveWalletId = data.walletId || defaultWalletId;
@@ -339,7 +341,9 @@ export default function App() {
     }
 
     setEditingTransaction(null);
-    setCurrentTab('transactions');
+    if (navigateAfterSave) {
+      setCurrentTab('transactions');
+    }
   };
 
   // Handle Delete Transaction
@@ -637,8 +641,24 @@ export default function App() {
                 }}
                 onOpenPdfExport={() => handleOpenPdfExport('monthly')}
                 onOpenTransfer={() => setCurrentTab('wallets')}
+                onOpenChatRecord={() => setCurrentTab('chat')}
                 user={user}
                 onSignIn={handleSignIn}
+              />
+            )}
+
+            {currentTab === 'chat' && (
+              <ChatTransactionView
+                categories={allCategories}
+                wallets={wallets}
+                lang={lang}
+                onSave={(data) => handleSaveTransaction(data, false)}
+                onNavigateToDashboard={() => setCurrentTab('dashboard')}
+                onNavigateToTransactions={() => setCurrentTab('transactions')}
+                onSwitchToForm={() => {
+                  setEditingTransaction(null);
+                  setCurrentTab('add');
+                }}
               />
             )}
 
@@ -692,11 +712,13 @@ export default function App() {
                 categories={allCategories}
                 wallets={wallets}
                 lang={lang}
-                onSave={handleSaveTransaction}
+                onSave={(data) => handleSaveTransaction(data, true)}
                 onCancel={() => {
                   setEditingTransaction(null);
                   setCurrentTab('dashboard');
                 }}
+                onNavigateToDashboard={() => setCurrentTab('dashboard')}
+                onNavigateToTransactions={() => setCurrentTab('transactions')}
               />
             )}
 
