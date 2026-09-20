@@ -13,6 +13,18 @@ service cloud.firestore {
         request.auth.token.email.lower() == '0708saipin@gmail.com';
     }
     
+    // Bug & Error Reports collection
+    match /bug_reports/{reportId} {
+      // Anyone can read reports to check their status in real-time
+      allow read: if true;
+      // Anyone can submit a bug report (authenticated or guest) with valid message length
+      allow create: if request.resource.data.message is string && 
+                       request.resource.data.message.size() > 0 && 
+                       request.resource.data.message.size() <= 3000;
+      // Admin can update status, add admin response or delete reports
+      allow update, delete: if isAdmin();
+    }
+    
     // System public configuration, announcements, and global default categories
     match /system/{document=**} {
       // Public or all users can read system announcements and global categories
@@ -34,7 +46,7 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       
-      // User subcollections (transactions, categories, settings)
+      // User subcollections (transactions, categories, settings, wallets, budgets)
       match /{allChildren=**} {
         allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       }

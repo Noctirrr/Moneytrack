@@ -92,3 +92,21 @@ export interface UserProfile {
   photoURL?: string;
   lastLoginAt: number;
 }
+
+export type BugReportStatus = 'pending' | 'investigating' | 'resolved';
+export type BugReportType = 'bug' | 'calculation' | 'ui' | 'feature' | 'other';
+
+export interface BugReport {
+  id: string;
+  message: string;
+  reportType?: BugReportType;
+  status: BugReportStatus;
+  userId?: string;
+  userEmail?: string;
+  userDisplayName?: string;
+  deviceInfo?: string;
+  language?: string;
+  adminResponse?: string;
+  createdAt: number;
+  updatedAt?: number;
+}

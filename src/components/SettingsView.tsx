@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import { 
   Globe, 
@@ -10,14 +10,16 @@ import {
   Upload, 
   RefreshCcw, 
   Trash2, 
-  CloudCheck, 
   CheckCircle2,
   FileDown,
-  LogIn
+  LogIn,
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { Language, ThemeMode, Transaction, Category } from '../types';
 import { translations } from '../constants/translations';
 import { GoogleSignInButton } from './GoogleSignInButton';
+import { BugReportModal } from './BugReportModal';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 interface SettingsViewProps {
@@ -55,6 +57,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const t = translations[lang];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
+  const [bugReportTab, setBugReportTab] = useState<'create' | 'list'>('create');
 
   // Export JSON file
   const handleExport = () => {
@@ -277,6 +281,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
+      {/* System Bug & Error Reporting (ส่งตรงเข้า Firebase) */}
+      <div id="settings-bug-reporting-card" className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/80 dark:border-neutral-800 shadow-sm space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                <span>{t.reportBugBtn}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50">
+                  Firebase Direct
+                </span>
+              </h3>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                {t.reportBugSubtitle}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          {/* Button 1: Report issue (กล่องข้อความ และปุ่มส่ง พร้อมยืนยัน) */}
+          <button
+            id="settings-open-report-modal-btn"
+            onClick={() => {
+              setBugReportTab('create');
+              setIsBugReportModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 p-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold shadow-sm transition-all"
+          >
+            <AlertCircle size={16} />
+            <span>{t.reportBugBtn}</span>
+          </button>
+
+          {/* Button 2: Check status of reports (เราสามารถเช็คได้เลยว่าเป็นยังไงบ้าง) */}
+          <button
+            id="settings-check-reports-status-btn"
+            onClick={() => {
+              setBugReportTab('list');
+              setIsBugReportModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition-colors"
+          >
+            <Search size={16} />
+            <span>{t.checkReportsBtn}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Data Management Section */}
       <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200/80 dark:border-neutral-800 shadow-sm space-y-4">
         <h3 className="text-base font-bold text-neutral-900 dark:text-white">
@@ -354,6 +408,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Bug & Error Report Modal (Direct to Firebase) */}
+      <BugReportModal
+        isOpen={isBugReportModalOpen}
+        onClose={() => setIsBugReportModalOpen(false)}
+        lang={lang}
+        user={user}
+        initialTab={bugReportTab}
+      />
     </div>
   );
 };

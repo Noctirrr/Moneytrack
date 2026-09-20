@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { db } from '../firebase';
-import { Transaction, Category, SystemAnnouncement, SystemConfig, UserProfile, Wallet, Budget } from '../types';
+import { Transaction, Category, SystemAnnouncement, SystemConfig, UserProfile, Wallet, Budget, BugReport, BugReportStatus } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants/categories';
 
 export const ADMIN_EMAIL = '0708saipin@gmail.com';
@@ -492,5 +492,131 @@ export const deleteBudgetFromFirestore = async (
 ): Promise<void> => {
   const docRef = doc(db, 'users', userId, 'budgets', budgetId);
   await deleteDoc(docRef);
+};
+
+// ----------------------------------------------------
+// 8. BUG & ERROR REPORTS (Direct to Firebase Firestore)
+// ----------------------------------------------------
+
+export const LOCAL_SAVED_REPORTS_KEY = 'moneytrack_saved_reports';
+
+export const submitBugReport = async (
+  report: Omit<BugReport, 'id' | 'createdAt' | 'status'> & { status?: BugReportStatus }
+): Promise<BugReport> => {
+  const reportsRef = collection(db, 'bug_reports');
+  const docRef = doc(reportsRef);
+  const now = Date.now();
+
+  const newReport: BugReport = {
+    id: docRef.id,
+    message: String(report.message || '').trim(),
+    reportType: report.reportType || 'bug',
+    status: report.status || 'pending',
+    userId: report.userId || 'guest',
+    userEmail: report.userEmail || '',
+    userDisplayName: report.userDisplayName || '',
+    deviceInfo: report.deviceInfo || (typeof navigator !== 'undefined' ? `${navigator.userAgent} (${window.innerWidth}x${window.innerHeight})` : ''),
+    language: report.language || 'th',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // 1. Save directly into Firestore database
+  try {
+    await setDoc(docRef, newReport);
+  } catch (err) {
+    console.error('Failed to write bug report to Firestore:', err);
+    // Still store locally below so user does not lose their report
+  }
+
+  // 2. Cache in localStorage so user can check it immediately in all circumstances
+  try {
+    const existingStr = localStorage.getItem(LOCAL_SAVED_REPORTS_KEY);
+    const existingList: BugReport[] = existingStr ? JSON.parse(existingStr) : [];
+    const updatedList = [newReport, ...existingList.filter((r) => r.id !== newReport.id)].slice(0, 50);
+    localStorage.setItem(LOCAL_SAVED_REPORTS_KEY, JSON.stringify(updatedList));
+  } catch (storageErr) {
+    console.warn('LocalStorage error while saving bug report cache:', storageErr);
+  }
+
+  return newReport;
+};
+
+export const subscribeToBugReports = (
+  onUpdate: (reports: BugReport[]) => void,
+  onError?: (err: any) => void
+) => {
+  const reportsRef = collection(db, 'bug_reports');
+  const q = query(reportsRef, orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: BugReport[] = [];
+      snapshot.forEach((d) => {
+        list.push({
+          id: d.id,
+          ...d.data(),
+        } as BugReport);
+      });
+      onUpdate(list);
+    },
+    (err) => {
+      console.warn('Bug reports subscription error:', err);
+      // Fallback to local storage cache if firestore query has issue
+      try {
+        const cached = localStorage.getItem(LOCAL_SAVED_REPORTS_KEY);
+        if (cached) {
+          onUpdate(JSON.parse(cached));
+        }
+      } catch {
+        // ignore
+      }
+      if (onError) onError(err);
+    }
+  );
+};
+
+export const updateBugReportStatus = async (
+  reportId: string,
+  status: BugReportStatus,
+  adminResponse?: string
+): Promise<void> => {
+  const docRef = doc(db, 'bug_reports', reportId);
+  const payload: Record<string, any> = {
+    status,
+    updatedAt: Date.now(),
+  };
+  if (adminResponse !== undefined) {
+    payload.adminResponse = adminResponse.trim();
+  }
+  await setDoc(docRef, payload, { merge: true });
+
+  // Update local cache if present
+  try {
+    const existingStr = localStorage.getItem(LOCAL_SAVED_REPORTS_KEY);
+    if (existingStr) {
+      const list: BugReport[] = JSON.parse(existingStr);
+      const updated = list.map((r) => (r.id === reportId ? { ...r, status, ...(adminResponse !== undefined ? { adminResponse } : {}) } : r));
+      localStorage.setItem(LOCAL_SAVED_REPORTS_KEY, JSON.stringify(updated));
+    }
+  } catch (e) {
+    // ignore
+  }
+};
+
+export const deleteBugReport = async (reportId: string): Promise<void> => {
+  const docRef = doc(db, 'bug_reports', reportId);
+  await deleteDoc(docRef);
+
+  try {
+    const existingStr = localStorage.getItem(LOCAL_SAVED_REPORTS_KEY);
+    if (existingStr) {
+      const list: BugReport[] = JSON.parse(existingStr);
+      localStorage.setItem(LOCAL_SAVED_REPORTS_KEY, JSON.stringify(list.filter((r) => r.id !== reportId)));
+    }
+  } catch (e) {
+    // ignore
+  }
 };
 

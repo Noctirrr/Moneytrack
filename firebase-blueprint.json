@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "User income, expense, or transfer transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense", "transfer"] },
+        "amount": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "walletId": { "type": "string" },
+        "toWalletId": { "type": "string" },
+        "date": { "type": "string" },
+        "note": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "type", "amount", "categoryId", "date"]
+    },
+    "BugReport": {
+      "title": "BugReport",
+      "description": "User submitted error reports, bugs, and feedback sent directly to Firebase",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "reportType": { "type": "string", "enum": ["bug", "calculation", "ui", "feature", "other"] },
+        "status": { "type": "string", "enum": ["pending", "investigating", "resolved"] },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userDisplayName": { "type": "string" },
+        "deviceInfo": { "type": "string" },
+        "language": { "type": "string" },
+        "adminResponse": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "message", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/bug_reports/{reportId}": {
+      "schema": "BugReport",
+      "description": "Collection of all user-submitted bug and error reports"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User-specific financial transactions"
+    }
+  }
+}
